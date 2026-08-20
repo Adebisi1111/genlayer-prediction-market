@@ -1,56 +1,78 @@
-# 🧠 GenLayer Prediction Market Resolver
+# GenLayer Prediction Market Resolver
 
-An **Intelligent Contract** on GenLayer that resolves prediction-market questions by reading cited web sources and reaching AI-validator **consensus** on the outcome — now with a built-in **dispute & re-resolution workflow** and an **immutable on-chain resolution history**.
+An Intelligent Contract that resolves YES/NO prediction markets on GenLayer by having validators reach optimistic-democracy consensus over live web evidence, then binds that verdict to a verifiable market record and settles real stakes through it.
 
-> Network: **Bradbury testnet** (Chain ID 4221) · Explorer: https://explorer-bradbury.genlayer.com
+- Live contract (v0.3.0): `0x86d36795b66c29A7445945585a4C9f09C289C8ba` (Bradbury testnet)
+- Explorer: https://explorer-bradbury.genlayer.com/address/0x86d36795b66c29A7445945585a4C9f09C289C8ba
 
-## ✨ What's new in v0.2.0
+## Why it needs GenLayer
 
-- **Dispute workflow** — anyone can contest a resolved market with a written reason. The contract re-runs the full AI resolution, treating the disputant's claim as *untrusted context* (evidence and rules always win — a dispute is never a command).
-- **On-chain resolution history** — every resolution and dispute is appended to an immutable `history` list: `{round, kind, outcome, rationale, by, note}`.
-- **Consensus-robust resolution** — the resolver prompt now degrades gracefully when a source fails to load, so independent validators converge on the same outcome value instead of stalling in the consensus round.
-- **Anti-abuse cap** — a market accepts at most **2 disputes**.
+A prediction market must decide a real-world question from sources no single node can be trusted to read honestly. GenLayer validators independently fetch the cited web sources and must reach comparative consensus on the same outcome, so the verdict is trustless and reproducible, not the opinion of one oracle.
 
-## 🔍 How it works
+## What v0.3.0 hardens
 
-1. A market is deployed with a `question`, `rules`, and up to three source URLs.
-2. `resolve()` fetches each source with `gl.nondet.web.render`, builds a strict resolver prompt, and settles the outcome (`YES` / `NO` / `UNRESOLVED`) via `gl.eq_principle.prompt_comparative` — validators must agree on the final outcome value, not the wording.
-3. `dispute(reason)` re-runs the same resolution with an extra **untrusted** `DISPUTANT CONTEXT` block. A weak or false dispute does **not** flip a well-evidenced outcome.
-4. Every round is written to `history`, fully auditable on-chain.
+Earlier versions produced a verdict but did not bind it to a verifiable record or consume it in a consequential workflow. v0.3.0 fixes exactly that:
 
-## 📜 Contract API
+1. Verifiable market record. The market is created with an immutable `market_id`, and the contract stores `question_hash` and `rules_hash` (SHA-256 of the exact question and resolution rules). Anyone can call `verify_question(q)` / `verify_rules(r)` to prove the text the verdict was based on has not been altered. The outcome is bound to this record, not to free-floating text.
+2. Consequential settlement workflow. The verdict is consumed by real economic paths, not just displayed: `stake(side, amount)` records YES/NO positions in an on-chain ledger; `resolve()` runs validator consensus and sets the outcome; `settle()` locks the winning side once the outcome is YES/NO; `claim()` pays parimutuel winnings.
+3. Appeal / dispute path with real consequence. `dispute(reason)` freezes a resolved market and forces re-resolution; `resolve_dispute()` re-runs consensus and records `dispute_outcome = OVERTURNED` (verdict changed) or `UPHELD` (verdict stood). Disputes are bounded (max 2) and every round is appended to an on-chain audit trail.
+4. Prompt-injection defense. Source text and disputant context are wrapped as untrusted data; the resolver treats any embedded instructions as data, ignores failed fetches, and only answers YES/NO/UNRESOLVED from genuine evidence.
 
-```py
-resolve()                # settle an open market from its sources (YES / NO / UNRESOLVED)
-dispute(reason: str)     # contest a resolved market -> re-runs resolution, appends history (max 2)
-add_source(url: str)     # creator-only, http(s) only, before resolution
-get_state() -> dict      # full state incl. outcome, rationale, dispute_note, history
-```
+## Payout math
 
-## 🚀 Live deployments (Bradbury testnet)
+Settlement is parimutuel: winners split the whole pool in proportion to their winning stake.
 
-**v0.2.0 (current)** — contract [`0x5853abFE0CBF83ac65cd3DACFB35Bb1B0314C969`](https://explorer-bradbury.genlayer.com/address/0x5853abFE0CBF83ac65cd3DACFB35Bb1B0314C969)
-- deploy tx: [`0x9c21adca…`](https://explorer-bradbury.genlayer.com/tx/0x9c21adcaf07c8d26c35331bb86afbf257150acfd0eb468129b5367b9530dce8b)
-- resolve tx (→ **YES**): [`0x6c35f15a…`](https://explorer-bradbury.genlayer.com/tx/0x6c35f15a1fbfd097a5f6a87b91db52c7187cb3b6efdd65ddf2d6fea287807619)
-- dispute tx (false claim — outcome **held YES**): [`0x1fe419ff…`](https://explorer-bradbury.genlayer.com/tx/0x1fe419ff3de11fa15578ad050493b0bb23d1e52623a517a534ee4a92c29a7754)
+    payout = your_winning_stake * total_pool / winning_pool
 
-**v0.1.0** — contract [`0xd2Ead3C6BbaCe1D423F156762f33A2C9B406C73f`](https://explorer-bradbury.genlayer.com/address/0xd2Ead3C6BbaCe1D423F156762f33A2C9B406C73f)
-- resolve tx (→ **YES**): [`0x1bdd2fb1…`](https://explorer-bradbury.genlayer.com/tx/0x1bdd2fb16036261169767c12b81e897100729213e761504bb89169f8c89f7661)
+Example: YES pool 100, NO pool 50, total 150, outcome YES. A YES staker of 100 claims 100 * 150 / 100 = 150.
 
-## 🛠️ Local usage
+## Lifecycle
 
-```bash
-npm install
-# create .env with: PRIVATE_KEY=0xYOUR_TESTNET_KEY
-node --env-file=.env deploy.mjs       # deploy a fresh market
-node --env-file=.env interact.mjs     # resolve -> dispute demo (robust submit-retry)
-node --env-file=.env test.mjs         # full test suite (9/9)
-```
+    open --stake--> open --resolve--> resolved --settle--> settled --claim--> paid
+                                          |   ^
+                                    dispute   resolve_dispute
+                                          v   |
+                                       disputed
 
-## 🔒 Security
+## Contract API
 
-See [`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md) — covers prompt-injection handling for both in-source evidence and disputant context, consensus-robustness against partial source failures, submission ordering on the consensus contract, and access control.
+Views:
+- `get_state()` returns full market state plus computed `yes_pool` / `no_pool` / `total_pool`.
+- `verify_question(q)` / `verify_rules(r)` return True if the SHA-256 matches the stored record.
 
-## 🧩 Tech
+Writes:
+- `add_source(url)` creator only, while open.
+- `stake(side, amount)` "YES" or "NO", while open.
+- `resolve()` open to resolved via validator consensus.
+- `dispute(reason)` resolved to disputed (max 2).
+- `resolve_dispute()` creator, disputed to resolved, sets OVERTURNED/UPHELD.
+- `settle()` creator, resolved (YES/NO) to settled, locks winning side.
+- `claim()` settled, pays parimutuel winnings to a winning staker.
 
-GenLayer Intelligent Contract (Python) · `genlayer-js` SDK · Bradbury testnet · zero external stubs, all resolutions run through real on-chain AI consensus.
+## Consensus resolver
+
+`resolve()` fetches each cited source with `gl.nondet.web.render`, builds a neutral decision prompt (question + rules + evidence), and runs it under `gl.eq_principle.prompt_comparative` so independent validators must agree on the final outcome value (YES / NO / UNRESOLVED). Wording or which sources loaded may differ; only the outcome must match.
+
+## Deployments
+
+| Version | Address | Notes |
+| --- | --- | --- |
+| v0.3.0 | 0x86d36795b66c29A7445945585a4C9f09C289C8ba | market record + stake/settle/claim + dispute |
+| v0.2.0 | 0x5853abFE0CBF83ac65cd3DACFB35Bb1B0314C969 | resolve + dispute |
+
+## Run it
+
+Set your key in `.env` (never commit it):
+
+    PRIVATE_KEY=0x...
+
+Deploy and run the full demo:
+
+    node --env-file=.env deploy.mjs
+    node --env-file=.env run.mjs
+
+`run.mjs` is idempotent and resumable: it stakes YES and NO, resolves, disputes, resolves the dispute, settles, and claims, retrying through testnet rate limits and skipping already-completed steps.
+
+## Tests
+
+`test.mjs` exercises the lifecycle and guard rails (staking only while open, dispute limits, creator-only settle, parimutuel math).
