@@ -1,88 +1,56 @@
-# PredictionMarketResolver — AI-Resolved Prediction Market on GenLayer
+# 🧠 GenLayer Prediction Market Resolver
 
-An **Intelligent Contract** that resolves a binary prediction market **without a trusted oracle**. The contract stores a question, human-readable resolution rules, and up to three web sources. When `resolve()` is called, each GenLayer validator independently renders the live sources, asks an LLM to judge the outcome strictly from that evidence, and the network reaches **comparative consensus** on a final verdict: `YES`, `NO`, or `UNRESOLVED`.
+An **Intelligent Contract** on GenLayer that resolves prediction-market questions by reading cited web sources and reaching AI-validator **consensus** on the outcome — now with a built-in **dispute & re-resolution workflow** and an **immutable on-chain resolution history**.
 
-## Why it matters
+> Network: **Bradbury testnet** (Chain ID 4221) · Explorer: https://explorer-bradbury.genlayer.com
 
-A normal smart contract cannot read a web page or make a judgement call, so prediction markets rely on a centralized oracle or a human resolver to report the result. GenLayer can do both natively. This contract shows a market that **settles itself** from public evidence, trustlessly, with the decision recorded on-chain.
+## ✨ What's new in v0.2.0
 
-## Live deployment (Testnet Bradbury)
+- **Dispute workflow** — anyone can contest a resolved market with a written reason. The contract re-runs the full AI resolution, treating the disputant's claim as *untrusted context* (evidence and rules always win — a dispute is never a command).
+- **On-chain resolution history** — every resolution and dispute is appended to an immutable `history` list: `{round, kind, outcome, rationale, by, note}`.
+- **Consensus-robust resolution** — the resolver prompt now degrades gracefully when a source fails to load, so independent validators converge on the same outcome value instead of stalling in the consensus round.
+- **Anti-abuse cap** — a market accepts at most **2 disputes**.
 
-- **Contract:** `0xd2Ead3C6BbaCe1D423F156762f33A2C9B406C73f`
-- **Network:** GenLayer Testnet Bradbury (Chain ID `4221`)
-- **Explorer:** https://explorer-bradbury.genlayer.com (search the contract address or the tx hashes below)
+## 🔍 How it works
 
-### Verified on-chain demo — verdict `YES`
+1. A market is deployed with a `question`, `rules`, and up to three source URLs.
+2. `resolve()` fetches each source with `gl.nondet.web.render`, builds a strict resolver prompt, and settles the outcome (`YES` / `NO` / `UNRESOLVED`) via `gl.eq_principle.prompt_comparative` — validators must agree on the final outcome value, not the wording.
+3. `dispute(reason)` re-runs the same resolution with an extra **untrusted** `DISPUTANT CONTEXT` block. A weak or false dispute does **not** flip a well-evidenced outcome.
+4. Every round is written to `history`, fully auditable on-chain.
 
-- **Question:** *According to the cited sources, has Ethereum completed 'The Merge' and now runs on Proof-of-Stake?*
-- **Sources:** `https://en.wikipedia.org/wiki/The_Merge`, `https://en.wikipedia.org/wiki/Ethereum`
+## 📜 Contract API
 
-| Step | Transaction hash |
-| --- | --- |
-| Deploy | `0xd5cadff271d913051954c9b67f3ce8fdf670b9e1ea79837915397fd8a687bcff` |
-| resolve (AI verdict) | `0x1bdd2fb16036261169767c12b81e897100729213e761504bb89169f8c89f7661` |
+```py
+resolve()                # settle an open market from its sources (YES / NO / UNRESOLVED)
+dispute(reason: str)     # contest a resolved market -> re-runs resolution, appends history (max 2)
+add_source(url: str)     # creator-only, http(s) only, before resolution
+get_state() -> dict      # full state incl. outcome, rationale, dispute_note, history
+```
 
-Final state: `status = resolved`, `outcome = YES`. The validator network agreed, strictly from the cited evidence, that Ethereum completed The Merge and runs on Proof-of-Stake.
+## 🚀 Live deployments (Bradbury testnet)
 
-## How it works
+**v0.2.0 (current)** — contract [`0x5853abFE0CBF83ac65cd3DACFB35Bb1B0314C969`](https://explorer-bradbury.genlayer.com/address/0x5853abFE0CBF83ac65cd3DACFB35Bb1B0314C969)
+- deploy tx: [`0x9c21adca…`](https://explorer-bradbury.genlayer.com/tx/0x9c21adcaf07c8d26c35331bb86afbf257150acfd0eb468129b5367b9530dce8b)
+- resolve tx (→ **YES**): [`0x6c35f15a…`](https://explorer-bradbury.genlayer.com/tx/0x6c35f15a1fbfd097a5f6a87b91db52c7187cb3b6efdd65ddf2d6fea287807619)
+- dispute tx (false claim — outcome **held YES**): [`0x1fe419ff…`](https://explorer-bradbury.genlayer.com/tx/0x1fe419ff3de11fa15578ad050493b0bb23d1e52623a517a534ee4a92c29a7754)
 
-1. **Deploy** sets the market: `question`, `rules`, and up to three source URLs. Status starts at `open`.
-2. **add_source(url)** lets the market **creator** attach an extra source before resolution (validated to be an http(s) URL).
-3. **resolve()** runs a non-deterministic block:
-   - `gl.nondet.web.render(url, mode="text")` fetches the live text of each source,
-   - `gl.nondet.exec_prompt(...)` asks an LLM to decide YES / NO / UNRESOLVED strictly from that evidence under the rules,
-   - `gl.eq_principle.prompt_comparative(...)` makes validators reach consensus on the verdict (the correct equivalence principle for subjective LLM output).
-4. The verdict and a human-readable rationale are written on-chain; status becomes `resolved`.
+**v0.1.0** — contract [`0xd2Ead3C6BbaCe1D423F156762f33A2C9B406C73f`](https://explorer-bradbury.genlayer.com/address/0xd2Ead3C6BbaCe1D423F156762f33A2C9B406C73f)
+- resolve tx (→ **YES**): [`0x1bdd2fb1…`](https://explorer-bradbury.genlayer.com/tx/0x1bdd2fb16036261169767c12b81e897100729213e761504bb89169f8c89f7661)
 
-## Security & tests
+## 🛠️ Local usage
 
-Hardening applied (see `docs/SECURITY-AUDIT.md` for the full review):
+```bash
+npm install
+# create .env with: PRIVATE_KEY=0xYOUR_TESTNET_KEY
+node --env-file=.env deploy.mjs       # deploy a fresh market
+node --env-file=.env interact.mjs     # resolve -> dispute demo (robust submit-retry)
+node --env-file=.env test.mjs         # full test suite (9/9)
+```
 
-- **Access control:** only the market `creator` can `add_source`.
-- **Prompt-injection defense:** source text is explicitly framed as untrusted data; the model is constrained to a strict JSON enum.
-- **Robust parsing:** malformed LLM output is caught and defaults to the safe `UNRESOLVED`.
-- **Input validation:** sources must be http(s) URLs.
-- **State guards:** a market cannot be resolved twice, cannot be resolved with no source, and cannot accept sources after resolution.
+## 🔒 Security
 
-Automated suite (`test.mjs`), **5/5 passing** on live Testnet Bradbury:
+See [`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md) — covers prompt-injection handling for both in-source evidence and disputant context, consensus-robustness against partial source failures, submission ordering on the consensus contract, and access control.
 
-- Live multi-source resolution returns YES from real sources.
-- resolve() cannot run twice.
-- add_source reverts after resolution.
-- resolve() reverts with no source configured.
-- Non-http(s) source URL is rejected.
+## 🧩 Tech
 
-**Known limitation:** this version records the adjudicated verdict and market state on-chain; it does not custody GEN stakes or pay out winners. On-chain stake custody and payout are the planned next iteration.
-
-## Contract interface
-
-- `get_state() -> dict` (view) — full market state.
-- `add_source(url: str)` (write, creator-only) — attach an extra source while open.
-- `resolve()` (write) — validators reach a verdict via consensus.
-
-## Run it yourself
-
-    npm install            # genlayer-js + viem
-    cp .env.example .env   # then fill PRIVATE_KEY and ADDRESS of a funded Bradbury wallet
-    npm run deploy         # deploys, writes contract.txt + deploy-tx.txt
-    npm run interact       # end-to-end demo: read -> resolve -> read (verdict)
-    npm run test           # automated security/behavior suite on live testnet
-
-## Tech
-
-- **Contract:** Python Intelligent Contract on GenVM (pinned py-genlayer runner).
-- **Client:** genlayer-js on Node.js.
-- **Consensus:** GenLayer Optimistic Democracy + Equivalence Principle (prompt_comparative).
-
-## Files
-
-- `contracts/prediction_market.py` — the PredictionMarketResolver Intelligent Contract.
-- `deploy.mjs` — deploys the contract, saves address to contract.txt.
-- `interact.mjs` — end-to-end demo (state -> resolve -> state).
-- `test.mjs` — automated security/behavior test suite.
-- `docs/SECURITY-AUDIT.md` — self-conducted security audit.
-- `.github/workflows/ci.yml` — static checks (contract + client syntax).
-
-## License
-
-MIT — see `LICENSE`.
+GenLayer Intelligent Contract (Python) · `genlayer-js` SDK · Bradbury testnet · zero external stubs, all resolutions run through real on-chain AI consensus.
