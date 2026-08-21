@@ -2,8 +2,8 @@
 
 An Intelligent Contract that resolves YES/NO prediction markets on GenLayer by having validators reach optimistic-democracy consensus over live web evidence, then binds that verdict to a verifiable market record and settles real stakes through it.
 
-- Live contract (v0.3.0): `0x86d36795b66c29A7445945585a4C9f09C289C8ba` (Bradbury testnet)
-- Explorer: https://explorer-bradbury.genlayer.com/address/0x86d36795b66c29A7445945585a4C9f09C289C8ba
+- Live contract (v0.4.0): `0x72f6BE503a8319A40515641536C1d74378623914` (Bradbury testnet)
+- Explorer: https://explorer-bradbury.genlayer.com/address/0x72f6BE503a8319A40515641536C1d74378623914
 
 ## Why it needs GenLayer
 
@@ -58,6 +58,7 @@ Writes:
 | Version | Address | Notes |
 | --- | --- | --- |
 | v0.3.0 | 0x86d36795b66c29A7445945585a4C9f09C289C8ba | market record + stake/settle/claim + dispute |
+| v0.4.0 | 0x72f6BE503a8319A40515641536C1d74378623914 | + creator-guarded resolve, retryable UNRESOLVED, void/refund escape |
 | v0.2.0 | 0x5853abFE0CBF83ac65cd3DACFB35Bb1B0314C969 | resolve + dispute |
 
 ## Run it
@@ -76,3 +77,19 @@ Deploy and run the full demo:
 ## Tests
 
 `test.mjs` exercises the lifecycle and guard rails (staking only while open, dispute limits, creator-only settle, parimutuel math).
+
+## Live proof (v0.4.0 - Testnet Bradbury)
+
+Steward-requested lifecycle fixes, verified on-chain:
+- resolve() is now creator-guarded (a non-creator call reverts).
+- An UNRESOLVED verdict keeps the market open and retryable (no longer permanently closes it); the creator may also void() an unsettled market so stakers can refund.
+
+Contract: `0x72f6BE503a8319A40515641536C1d74378623914`
+
+- deploy: `0x9ac9f1f6d09dbbe25ac0211c488277b83bd9d61ce4ceba048cb05d2b0fe356a6`
+- resolve #1 (unsettled -> UNRESOLVED, stays open): `0x8dcdfd919be2cd7adc995a3d8f7de200e47c9b898212fa5af9889f1169a77f6e`
+- resolve #2 (retry allowed, still open): `0xcab38ef732b909e4c609a652f15bf44f1e5b1859e9f07319026c75d3cbfcd322`
+- void (funds-safe escape): `0x2fc1acdf11b38d3d5d2606533ef066ace47af9215ff027c0fb2c1dd7ba6c98c6`
+- non-creator resolve() reverts (guard) - see pm-guard.mjs
+
+Explorer: https://explorer-bradbury.genlayer.com
