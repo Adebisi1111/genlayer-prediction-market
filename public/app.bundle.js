@@ -37841,7 +37841,23 @@ async function connect2() {
       btn.textContent = "Connect Wallet";
       return;
     }
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    let accounts = [];
+    try {
+      accounts = await window.ethereum.request({ method: "eth_accounts" });
+    } catch (e) {
+    }
+    if (!accounts || accounts.length === 0) {
+      try {
+        accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      } catch (reqErr) {
+        if (reqErr.message && reqErr.message.includes("already pending")) {
+          alert("A wallet request is pending. Please open MetaMask and approve or reject the pending request, then try again.");
+          btn.textContent = "Connect Wallet";
+          return;
+        }
+        throw reqErr;
+      }
+    }
     if (!accounts || accounts.length === 0) {
       throw new Error("No accounts found. Please unlock MetaMask.");
     }
@@ -37858,7 +37874,7 @@ async function connect2() {
     b.textContent = "Failed: " + e.message;
     btn.textContent = "Connect Wallet";
     if (e.message && e.message.includes("already pending")) {
-      alert("A wallet request is pending. Please check MetaMask and approve or reject the request.");
+      alert("A wallet request is pending. Please open MetaMask, approve or reject the pending request, then close ALL browser tabs and try again.");
     }
   }
 }

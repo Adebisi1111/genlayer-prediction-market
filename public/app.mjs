@@ -13,13 +13,32 @@ async function connect(){
     btn.textContent = "Connecting...";
     if (!window.ethereum) { alert("Open in MetaMask browser"); btn.textContent = "Connect Wallet"; return; }
     
-    // Request accounts first (avoids "already pending" error)
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    // First, try to get accounts silently (won't trigger popup if already connected)
+    let accounts = [];
+    try {
+      accounts = await window.ethereum.request({ method: "eth_accounts" });
+    } catch(e) {}
+    
+    // If no accounts, request them
+    if (!accounts || accounts.length === 0) {
+      try {
+        accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      } catch(reqErr) {
+        // If "already pending", the user needs to check MetaMask
+        if (reqErr.message && reqErr.message.includes("already pending")) {
+          alert("A wallet request is pending. Please open MetaMask and approve or reject the pending request, then try again.");
+          btn.textContent = "Connect Wallet";
+          return;
+        }
+        throw reqErr;
+      }
+    }
+    
     if (!accounts || accounts.length === 0) {
       throw new Error("No accounts found. Please unlock MetaMask.");
     }
     
-    // Then create client
+    // Create client and connect
     client = createClient({ chain: testnetBradbury });
     await client.connect('testnetBradbury');
     
@@ -34,7 +53,7 @@ async function connect(){
     b.textContent = "Failed: " + e.message; 
     btn.textContent = "Connect Wallet"; 
     if (e.message && e.message.includes("already pending")) {
-      alert("A wallet request is pending. Please check MetaMask and approve or reject the request.");
+      alert("A wallet request is pending. Please open MetaMask, approve or reject the pending request, then close ALL browser tabs and try again.");
     }
   }
 }
