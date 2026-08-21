@@ -253,10 +253,7 @@ function renderMarkets(){
 function openMarket(id){
   const m = sampleMarkets.find(x => x.id === id);
   if(!m) return;
-  const amt = prompt(`Stake on "${m.q}"\n\nEnter amount in GEN:`);
-  if(amt && parseFloat(amt) > 0){
-    alert(`Staked ${amt} GEN on ${m.options[0].name}!\n\n(This is a demo — connect wallet to stake for real)`);
-  }
+  window.location.href = `stake.html?q=${encodeURIComponent(m.q)}&cat=${m.cat}&pool=${m.pool}&yes=${(m.options[0].price*100).toFixed(0)}&no=${(m.options[1].price*100).toFixed(0)}&status=${m.status}&outcome=${m.outcome||''}`;
 }
 
 function createMarket(){
