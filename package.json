@@ -5,6 +5,7 @@
   "type": "module",
   "license": "MIT",
   "dependencies": {
+    "ethers": "^6.17.0",
     "genlayer-js": "^1.1.8"
   }
 }
