@@ -11,6 +11,7 @@
     --green:#3fb950;--green-bg:#0d2818;
     --red:#f85149;--red-bg:#2d0a0a;
     --blue:#58a6ff;--blue-bg:#0d1a2d;
+    --orange:#f0883e;--orange-bg:#2d1a0d;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5}
@@ -27,6 +28,10 @@
   .badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;text-transform:uppercase}
   .cat-crypto{background:var(--orange-bg);color:var(--orange)}
   .cat-sports{background:var(--green-bg);color:var(--green)}
+  .cat-politics{background:var(--purple-bg);color:var(--purple)}
+  .cat-news{background:var(--blue-bg);color:var(--blue)}
+  .cat-entertainment{background:var(--red-bg);color:var(--red)}
+  .cat-science{background:var(--panel2);color:var(--muted)}
   .status-open{background:var(--green-bg);color:var(--green)}
   .status-resolved{background:var(--blue-bg);color:var(--blue)}
 
@@ -76,6 +81,10 @@
   .pool-total{text-align:center;padding:16px;background:var(--panel2);border-radius:8px;margin-bottom:20px}
   .pool-total-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
   .pool-total-value{font-size:28px;font-weight:800;color:var(--butter);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace}
+
+  .tx-result{margin-top:16px;padding:16px;background:var(--green-bg);border:1px solid var(--green);border-radius:8px;text-align:center;display:none}
+  .tx-result.show{display:block}
+  .tx-result a{color:var(--green);text-decoration:underline}
 </style>
 </head>
 <body>
@@ -87,7 +96,7 @@
 <div class="content">
   <div class="market-question" id="q">Loading...</div>
   <div class="market-meta">
-    <span class="badge" id="catBadge">CRYPTO</span>
+    <span class="badge cat-crypto" id="catBadge">CRYPTO</span>
     <span class="badge status-open" id="statusBadge">Open</span>
   </div>
 
@@ -101,11 +110,11 @@
     <div class="option-btns">
       <div class="opt-btn selected" onclick="selectOpt(this,'YES')">
         <div class="opt-name">Yes</div>
-        <div class="opt-price" id="yesPrice">—</div>
+        <div class="opt-price" id="yesPrice">62¢</div>
       </div>
       <div class="opt-btn" onclick="selectOpt(this,'NO')">
         <div class="opt-name">No</div>
-        <div class="opt-price" id="noPrice">—</div>
+        <div class="opt-price" id="noPrice">38¢</div>
       </div>
     </div>
   </div>
@@ -148,26 +157,44 @@
   </div>
 
   <button class="btn btn-win" id="stakeBtn" onclick="confirmStake()">Enter amount to stake</button>
+
+  <div class="tx-result" id="txResult">
+    <div>✅ Stake confirmed!</div>
+    <div style="margin-top:8px"><a id="txLink" href="#" target="_blank">View on Explorer</a></div>
+  </div>
 </div>
 
-<script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/genlayer-js@1.1.8/+esm";
-import { testnetBradbury } from "https://cdn.jsdelivr.net/npm/genlayer-js@1.1.8/chains/+esm";
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<script>
+const FACTORY = "0xDD457e0F2FfE7B843f8C90f7997DB06714666CC9";
+const RPC = "https://rpc-bradbury.genlayer.com";
+const EXPLORER = "https://explorer-bradbury.genlayer.com/tx/";
 
-const FACTORY = "0x6c2321c516f1793b5365Eb69d8257D6FbC885a7f";
-let client = null, account = null, isConnected = false;
-let state = { side: 'YES', price: 0.5, pool: 0, bal: 0, marketId: '', options: ['YES','NO'] };
+const ABI = [
+  "function stake(string marketId, string option) payable",
+  "function getConfig() view returns (uint256 marketCount)",
+];
 
+let provider = null, signer = null, contract = null, isConnected = false;
+let state = { side: 'YES', price: 0.62, pool: 0, bal: 0, marketId: '', options: ['YES','NO'] };
+
+// Parse URL params
 const params = new URLSearchParams(window.location.search);
 state.marketId = params.get('id') || '';
 const q = params.get('q');
+const cat = params.get('cat') || 'crypto';
 const pool = params.get('pool');
 const yesPool = params.get('yes');
 const noPool = params.get('no');
 const status = params.get('status');
-const opts = params.get('options');
 
+// Populate UI
 if(q) document.getElementById('q').textContent = q;
+if(cat) {
+  const badge = document.getElementById('catBadge');
+  badge.textContent = cat.toUpperCase();
+  badge.className = 'badge cat-' + cat;
+}
 if(pool) state.pool = parseInt(pool);
 if(yesPool && noPool){
   const yp = parseInt(yesPool), np = parseInt(noPool);
@@ -236,18 +263,23 @@ function calcPayout(){
 
 async function confirmStake(){
   const amt = parseFloat(document.getElementById('amt').value) || 0;
-  if(amt <= 0) return;
-  if(amt > state.bal) return;
+  if(amt <= 0) return alert('Enter an amount');
+  if(amt > state.bal) return alert('Insufficient balance');
   if(!isConnected) return alert('Please connect your wallet first');
   try {
-    const tx = await client.writeContract({
-      address: FACTORY, functionName: "stake",
-      args: [state.marketId, state.side],
-      value: BigInt(Math.floor(amt * 1e18)),
-    });
-    const q = encodeURIComponent(document.getElementById('q').textContent);
-    window.location.href = `success.html?q=${q}&side=${state.side}&amt=${amt}&tx=${tx}`;
-  } catch(e) { alert("Error: " + e.message); }
+    document.getElementById('stakeBtn').disabled = true;
+    document.getElementById('stakeBtn').textContent = 'Confirming...';
+    const tx = await contract.stake(state.marketId, state.side, { value: ethers.parseEther(amt.toString()) });
+    const receipt = await tx.wait();
+    document.getElementById('txResult').classList.add('show');
+    document.getElementById('txLink').href = EXPLORER + tx.hash;
+    document.getElementById('stakeBtn').textContent = 'Stake '+amt.toFixed(2)+' GEN on '+state.side;
+    document.getElementById('stakeBtn').disabled = false;
+  } catch(e) {
+    alert('Error: ' + e.message);
+    document.getElementById('stakeBtn').textContent = 'Stake '+amt.toFixed(2)+' GEN on '+state.side;
+    document.getElementById('stakeBtn').disabled = false;
+  }
 }
 
 async function checkConnection(){
@@ -256,14 +288,13 @@ async function checkConnection(){
     const accounts = await window.ethereum.request({method:"eth_accounts"});
     if(accounts && accounts.length > 0){
       isConnected = true;
-      state.connected = true;
-      account = {address: accounts[0]};
-      const bal = await window.ethereum.request({method:"eth_getBalance",params:[accounts[0],"latest"]});
-      state.bal = parseInt(bal,16)/1e18;
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      contract = new ethers.Contract(FACTORY, ABI, signer);
+      const address = await signer.getAddress();
+      const bal = await provider.getBalance(address);
+      state.bal = parseFloat(ethers.formatEther(bal));
       document.getElementById('balance').textContent = state.bal.toFixed(4)+' GEN';
-      client = createClient({chain:testnetBradbury});
-      await client.connect("testnetBradbury");
-      if(!client.account) client.account = {address: accounts[0]};
       calcPayout();
     }
   } catch(e) {}
