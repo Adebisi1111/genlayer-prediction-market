@@ -27,9 +27,14 @@
   .market-meta{display:flex;align-items:center;gap:12px;margin-bottom:32px}
   .badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;text-transform:uppercase}
   .cat-crypto{background:var(--orange-bg);color:var(--orange)}
+  .cat-sports{background:var(--green-bg);color:var(--green)}
+  .cat-politics{background:var(--purple-bg);color:var(--purple)}
+  .cat-news{background:var(--blue-bg);color:var(--blue)}
+  .cat-entertainment{background:var(--red-bg);color:var(--red)}
+  .cat-science{background:var(--panel2);color:var(--muted)}
   .status-open{background:var(--green-bg);color:var(--green)}
+  .status-resolved{background:var(--blue-bg);color:var(--blue)}
 
-  /* Stake form */
   .section{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px}
   .section-title{font-size:14px;font-weight:600;color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:.05em}
 
@@ -44,13 +49,11 @@
   .amount-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:14px;font-size:18px;font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace}
   .amount-input:focus{outline:none;border-color:var(--blue)}
   .amount-max{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;color:var(--butter);font-size:13px;font-weight:600;cursor:pointer}
-  .amount-max:hover{background:var(--border}
 
   .percent-btns{display:flex;gap:8px;margin-bottom:20px}
   .pct-btn{flex:1;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;text-align:center}
   .pct-btn:hover{border-color:var(--blue);color:var(--text)}
 
-  /* Payout preview */
   .payout-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
   .payout-box{padding:16px;border-radius:12px;text-align:center}
   .payout-win{background:var(--green-bg);border:1px solid var(--green)}
@@ -72,48 +75,54 @@
   .btn{width:100%;padding:16px;border:0;border-radius:12px;font-weight:700;font-size:16px;cursor:pointer;font-family:inherit;transition:all .15s}
   .btn:hover{filter:brightness(1.1)}
   .btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
-  .btn-primary{background:var(--butter);color:var(--bg)}
   .btn-win{background:var(--green);color:#fff}
+  .btn-connect{background:var(--blue);color:#fff}
 
   .pool-total{text-align:center;padding:16px;background:var(--panel2);border-radius:8px;margin-bottom:20px}
   .pool-total-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
   .pool-total-value{font-size:28px;font-weight:800;color:var(--butter);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace}
+
+  .connected-badge{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--green);margin-bottom:16px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
 </style>
 </head>
 <body>
 <div class="header">
   <a class="back" onclick="history.back()">← Back to Markets</a>
-  <span class="balance" id="balance">99.9820 GEN</span>
+  <span class="balance" id="balance">—</span>
 </div>
 
 <div class="content">
-  <div class="market-question" id="q">Will Bitcoin exceed $100,000 by end of 2026?</div>
+  <div class="market-question" id="q">Loading...</div>
   <div class="market-meta">
-    <span class="badge cat-crypto">Crypto</span>
-    <span class="badge status-open">Open</span>
+    <span class="badge" id="catBadge">—</span>
+    <span class="badge status-open" id="statusBadge">Open</span>
+  </div>
+
+  <div class="connected-badge" id="connBadge" style="display:none">
+    <div class="dot"></div>
+    <span>Wallet connected</span>
   </div>
 
   <div class="pool-total">
     <div class="pool-total-label">Total Pool</div>
-    <div class="pool-total-value">1,250 GEN</div>
+    <div class="pool-total-value" id="poolVal">0 GEN</div>
   </div>
 
-  <!-- Select outcome -->
   <div class="section">
     <div class="section-title">Select outcome</div>
     <div class="option-btns">
       <div class="opt-btn selected" onclick="selectOpt(this,'YES')">
         <div class="opt-name">Yes</div>
-        <div class="opt-price">62¢</div>
+        <div class="opt-price" id="yesPrice">62¢</div>
       </div>
       <div class="opt-btn" onclick="selectOpt(this,'NO')">
         <div class="opt-name">No</div>
-        <div class="opt-price">38¢</div>
+        <div class="opt-price" id="noPrice">38¢</div>
       </div>
     </div>
   </div>
 
-  <!-- Amount -->
   <div class="section">
     <div class="section-title">Amount</div>
     <div class="amount-row">
@@ -128,7 +137,6 @@
     </div>
   </div>
 
-  <!-- Payout preview -->
   <div class="section">
     <div class="section-title">Payout preview</div>
     <div class="payout-grid">
@@ -145,18 +153,18 @@
     </div>
     <div class="detail-rows">
       <div class="detail-row"><span class="detail-label">Your stake</span><span class="detail-value" id="dStake">0.00 GEN</span></div>
-      <div class="detail-row"><span class="detail-label">Pool after your stake</span><span class="detail-value" id="dPool">1,250 GEN</span></div>
+      <div class="detail-row"><span class="detail-label">Pool after your stake</span><span class="detail-value" id="dPool">0 GEN</span></div>
       <div class="detail-row"><span class="detail-label">Potential profit</span><span class="detail-value" id="dProfit" style="color:var(--green)">+0.00 GEN</span></div>
       <div class="detail-row"><span class="detail-label">Potential loss</span><span class="detail-value" id="dLoss" style="color:var(--red)">-0.00 GEN</span></div>
       <div class="detail-row"><span class="detail-label">ROI if correct</span><span class="detail-value" id="dRoi">0%</span></div>
     </div>
   </div>
 
-  <button class="btn btn-win" id="stakeBtn" onclick="confirmStake()">Connect Wallet to Stake</button>
+  <button class="btn btn-win" id="stakeBtn" onclick="confirmStake()">Enter amount to stake</button>
 </div>
 
 <script>
-const state = { side: 'YES', price: 0.62, pool: 1250, bal: 99.982, option: 'YES' };
+const state = { side: 'YES', price: 0.62, pool: 0, bal: 0, connected: false };
 const params = new URLSearchParams(window.location.search);
 const question = params.get('q');
 const category = params.get('cat');
@@ -169,10 +177,13 @@ const outcome = params.get('outcome');
 if(question) document.getElementById('q').textContent = question;
 if(pool) state.pool = parseInt(pool);
 if(optYes) state.price = parseFloat(optYes)/100;
-if(optNo) document.querySelectorAll('.opt-btn')[1].querySelector('.opt-price').textContent = (parseFloat(optNo)/100*100).toFixed(0)+'¢';
+if(optNo) document.getElementById('noPrice').textContent = optNo+'¢';
+if(optYes) document.getElementById('yesPrice').textContent = optYes+'¢';
+if(pool) document.getElementById('poolVal').textContent = parseInt(pool).toLocaleString()+' GEN';
+if(category) document.getElementById('catBadge').textContent = category;
 if(mStatus === 'resolved'){
-  document.querySelectorAll('.badge')[1].textContent = 'RESOLVED';
-  document.querySelectorAll('.badge')[1].className = 'badge status-open';
+  document.getElementById('statusBadge').textContent = 'RESOLVED';
+  document.getElementById('statusBadge').className = 'badge status-resolved';
   document.getElementById('stakeBtn').disabled = true;
   document.getElementById('stakeBtn').textContent = 'Market Resolved';
   document.getElementById('stakeBtn').style.background = 'var(--muted)';
@@ -186,8 +197,8 @@ function selectOpt(el, side){
   calcPayout();
 }
 
-function setMax(){ document.getElementById('amt').value = state.bal; calcPayout(); }
-function setPct(p){ document.getElementById('amt').value = (state.bal * p / 100).toFixed(4); calcPayout(); }
+function setMax(){ document.getElementById('amt').value = state.bal.toFixed(2); calcPayout(); }
+function setPct(p){ document.getElementById('amt').value = (state.bal * p / 100).toFixed(2); calcPayout(); }
 
 function calcPayout(){
   const amt = parseFloat(document.getElementById('amt').value) || 0;
@@ -205,19 +216,15 @@ function calcPayout(){
     document.getElementById('stakeBtn').disabled = true;
     return;
   }
-  
-  // Parimutuel: winners split total pool proportional to their winning stake
   const newPool = state.pool + amt;
   const winningPool = (state.side === 'YES' ? state.pool * state.price : state.pool * (1-state.price)) + amt;
   const payout = amt * newPool / winningPool;
   const profit = payout - amt;
   const roi = ((payout - amt) / amt * 100).toFixed(0);
-  const lossPct = '-100%';
-  
   document.getElementById('winAmt').textContent = '+'+payout.toFixed(2)+' GEN';
   document.getElementById('winPct').textContent = '+'+roi+'%';
   document.getElementById('loseAmt').textContent = '-'+amt.toFixed(2)+' GEN';
-  document.getElementById('losePct').textContent = lossPct;
+  document.getElementById('losePct').textContent = '-100%';
   document.getElementById('dStake').textContent = amt.toFixed(2)+' GEN';
   document.getElementById('dPool').textContent = newPool.toLocaleString()+' GEN';
   document.getElementById('dProfit').textContent = '+'+profit.toFixed(2)+' GEN';
@@ -225,19 +232,35 @@ function calcPayout(){
   document.getElementById('dRoi').textContent = roi+'%';
   document.getElementById('stakeBtn').textContent = 'Stake '+amt.toFixed(2)+' GEN on '+state.side;
   document.getElementById('stakeBtn').disabled = amt > state.bal;
-  if(amt > state.bal){
-    document.getElementById('stakeBtn').textContent = 'Insufficient balance';
-  }
+  if(amt > state.bal) document.getElementById('stakeBtn').textContent = 'Insufficient balance';
 }
 
-function confirmStake(){
+async function confirmStake(){
   const amt = parseFloat(document.getElementById('amt').value) || 0;
-  if(amt <= 0) return alert('Enter an amount');
-  if(amt > state.bal) return alert('Insufficient balance');
+  if(amt <= 0) return;
+  if(amt > state.bal) return;
+  if(!state.connected){
+    alert('Please connect your wallet first');
+    return;
+  }
   alert('Staked '+amt+' GEN on '+state.side+'!\n\n(This is a demo — connect wallet to stake for real)');
 }
 
-// Initialize
+async function checkConnection(){
+  if(!window.ethereum) return;
+  try {
+    const accounts = await window.ethereum.request({method:"eth_accounts"});
+    if(accounts && accounts.length > 0){
+      state.connected = true;
+      const bal = await window.ethereum.request({method:"eth_getBalance",params:[accounts[0],"latest"]});
+      state.bal = parseInt(bal,16)/1e18;
+      document.getElementById('balance').textContent = state.bal.toFixed(4)+' GEN';
+      document.getElementById('connBadge').style.display = 'flex';
+    }
+  } catch(e) {}
+}
+
+checkConnection();
 calcPayout();
 </script>
 </body>

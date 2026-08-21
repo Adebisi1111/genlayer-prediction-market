@@ -6,59 +6,42 @@
 <title>PrimeX — Prediction Markets</title>
 <style>
   :root{
-    --bg:#0a0e14;
-    --panel:#111820;
-    --panel2:#1a2230;
-    --border:#2a3540;
-    --butter:#e8c98a;
-    --butter-dim:#c9a86a;
-    --text:#e6edf3;
-    --muted:#7a8a9a;
-    --green:#3fb950;
-    --green-bg:#0d2818;
-    --red:#f85149;
-    --red-bg:#2d0a0a;
-    --blue:#58a6ff;
-    --blue-bg:#0d1a2d;
-    --purple:#a371f7;
-    --purple-bg:#1a0d2d;
-    --orange:#f0883e;
-    --orange-bg:#2d1a0d;
+    --bg:#0a0e14;--panel:#111820;--panel2:#1a2230;--border:#2a3540;
+    --butter:#e8c98a;--text:#e6edf3;--muted:#7a8a9a;
+    --green:#3fb950;--green-bg:#0d2818;
+    --red:#f85149;--red-bg:#2d0a0a;
+    --blue:#58a6ff;--blue-bg:#0d1a2d;
+    --orange:#f0883e;--orange-bg:#2d1a0d;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5}
 
-  /* Layout */
-  .app{display:flex;flex-direction:column;min-height:100vh}
   .header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
-  .main{flex:1;display:flex;flex-direction:column}
+  .main{display:flex;flex-direction:column}
   .content{flex:1;padding:24px;max-width:1400px;margin:0 auto;width:100%}
 
-  /* Header */
   .logo{display:flex;align-items:center;gap:10px}
-  .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--butter),var(--butter-dim));border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--bg);font-size:18px}
+  .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--butter),#c9a86a);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--bg);font-size:18px}
   .logo-text{font-size:20px;font-weight:700}
   .logo-badge{font-size:10px;background:var(--blue);color:#fff;padding:2px 8px;border-radius:10px;font-weight:600;margin-left:4px}
   .header-right{display:flex;align-items:center;gap:16px}
   .addr{font-size:13px;color:var(--butter);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace}
   .balance{font-size:13px;color:var(--green);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600}
-  .btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:8px;padding:10px 20px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;transition:all .15s}
+  .btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:8px;padding:10px 20px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
   .btn:hover{filter:brightness(1.1)}
   .btn-primary{background:var(--butter);color:var(--bg)}
   .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 16px;font-size:13px;border-radius:6px;cursor:pointer}
   .btn-outline:hover{background:var(--panel2)}
 
-  /* Categories */
   .categories{display:flex;gap:8px;overflow-x:auto;padding:4px 0 24px;scrollbar-width:none}
   .categories::-webkit-scrollbar{display:none}
-  .cat-btn{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:20px;border:1px solid var(--border);background:var(--panel);color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .15s}
+  .cat-btn{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:20px;border:1px solid var(--border);background:var(--panel);color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
   .cat-btn:hover{border-color:var(--blue);color:var(--text)}
   .cat-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
   .cat-icon{font-size:16px}
   .cat-count{font-size:11px;background:var(--panel2);padding:2px 6px;border-radius:10px}
   .cat-btn.active .cat-count{background:rgba(255,255,255,.2)}
 
-  /* Hero */
   .hero{padding:40px 0;text-align:center}
   .hero h1{font-size:36px;font-weight:800;margin-bottom:12px;background:linear-gradient(135deg,var(--text),var(--butter));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
   .hero p{color:var(--muted);font-size:16px;max-width:500px;margin:0 auto 24px}
@@ -67,11 +50,10 @@
   .hero-stat-value{font-size:24px;font-weight:700;color:var(--butter)}
   .hero-stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 
-  /* Markets grid */
   .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
   .section-title{font-size:20px;font-weight:700}
   .markets{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
-  .market{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;transition:all .15s;cursor:pointer}
+  .market{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;cursor:pointer;transition:all .15s}
   .market:hover{border-color:var(--blue);transform:translateY(-2px)}
   .market-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
   .market-category{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.05em}
@@ -88,7 +70,6 @@
   .market-question{font-size:15px;font-weight:600;margin-bottom:16px;line-height:1.4;min-height:44px}
   .market-options{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
   .market-option{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel2);border-radius:8px;font-size:13px}
-  .market-option:hover{background:var(--border)}
   .option-name{font-weight:500}
   .option-price{font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600;color:var(--butter)}
   .market-footer{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--border)}
@@ -96,25 +77,19 @@
   .market-pool span{font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600;color:var(--text)}
   .market-end{font-size:11px;color:var(--muted)}
 
-  /* Empty state */
   .empty{text-align:center;padding:80px 20px;color:var(--muted)}
   .empty-icon{font-size:48px;margin-bottom:16px;opacity:.3}
-  .empty-text{font-size:16px;margin-bottom:8px}
-  .empty-sub{font-size:13px}
 
-  /* Responsive */
   @media(max-width:768px){
     .header{padding:12px 16px;flex-wrap:wrap;gap:12px}
     .header-right{width:100%;justify-content:space-between}
     .hero h1{font-size:28px}
-    .hero-stats{gap:20px}
     .markets{grid-template-columns:1fr}
   }
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- Header -->
   <header class="header">
     <div class="logo">
       <div class="logo-icon">P</div>
@@ -128,13 +103,11 @@
     </div>
   </header>
 
-  <!-- Main -->
   <main class="main">
     <div class="content">
-      <!-- Hero -->
       <section class="hero">
         <h1>Predict the Future</h1>
-        <p>AI-powered prediction markets. Stake GEN on outcomes, verified by decentralized consensus.</p>
+        <p>All prediction markets. Stake GEN on outcomes, verified by decentralized consensus.</p>
         <button class="btn btn-primary" onclick="createMarket()">Create Market</button>
         <div class="hero-stats">
           <div class="hero-stat"><div class="hero-stat-value" id="totalMarkets">0</div><div class="hero-stat-label">Markets</div></div>
@@ -143,7 +116,6 @@
         </div>
       </section>
 
-      <!-- Categories -->
       <div class="categories">
         <button class="cat-btn active" onclick="filterCategory('all')">
           <span class="cat-icon">🔥</span> All <span class="cat-count" id="countAll">0</span>
@@ -168,18 +140,13 @@
         </button>
       </div>
 
-      <!-- Markets -->
       <section>
         <div class="section-header">
           <h2 class="section-title" id="sectionTitle">All Markets</h2>
           <span style="color:var(--muted);font-size:13px" id="marketCount">0 markets</span>
         </div>
         <div class="markets" id="marketsList">
-          <div class="empty">
-            <div class="empty-icon">📊</div>
-            <div class="empty-text">No markets yet</div>
-            <div class="empty-sub">Be the first to create a prediction market!</div>
-          </div>
+          <div class="empty"><div class="empty-icon">📊</div><div>No markets yet</div></div>
         </div>
       </section>
     </div>
@@ -193,7 +160,6 @@ import { testnetBradbury } from "https://cdn.jsdelivr.net/npm/genlayer-js@1.1.8/
 const FACTORY = "0x6c2321c516f1793b5365Eb69d8257D6FbC885a7f";
 let client = null, account = null, isConnected = false, currentCategory = "all";
 
-// Sample markets for demo (replace with contract reads)
 const sampleMarkets = [
   {id:"m1",q:"Will Bitcoin exceed $100,000 by end of 2026?",cat:"crypto",status:"open",pool:1250,end:"2026-12-31",options:[{name:"Yes",price:0.62},{name:"No",price:0.38}]},
   {id:"m2",q:"Will Manchester City win the 2026 Premier League?",cat:"sports",status:"open",pool:890,end:"2026-05-31",options:[{name:"Yes",price:0.45},{name:"No",price:0.55}]},
@@ -224,7 +190,7 @@ function renderMarkets(){
   document.getElementById("marketCount").textContent = markets.length + " markets";
   const el = document.getElementById("marketsList");
   if(markets.length === 0){
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">No markets in this category</div><div class="empty-sub">Create the first one!</div></div>';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>No markets in this category</div></div>';
     return;
   }
   el.innerHTML = markets.map(m => `
@@ -253,10 +219,7 @@ function renderMarkets(){
 function openMarket(id){
   const m = sampleMarkets.find(x => x.id === id);
   if(!m) return;
-  const amt = prompt(`Stake on "${m.q}"\n\nEnter amount in GEN:`);
-  if(amt && parseFloat(amt) > 0){
-    alert(`Staked ${amt} GEN on ${m.options[0].name}!\n\n(This is a demo — connect wallet to stake for real)`);
-  }
+  window.location.href = `stake.html?q=${encodeURIComponent(m.q)}&cat=${m.cat}&pool=${m.pool}&yes=${(m.options[0].price*100).toFixed(0)}&no=${(m.options[1].price*100).toFixed(0)}&status=${m.status}&outcome=${m.outcome||''}`;
 }
 
 function createMarket(){
@@ -294,7 +257,6 @@ async function connect(){
   } catch(e){ b.textContent = "Failed: " + e.message; btn.textContent = "Connect Wallet"; }
 }
 
-// Update category counts
 document.getElementById("countAll").textContent = sampleMarkets.length;
 document.getElementById("countSports").textContent = sampleMarkets.filter(m=>m.cat==="sports").length;
 document.getElementById("countCrypto").textContent = sampleMarkets.filter(m=>m.cat==="crypto").length;
