@@ -10,7 +10,23 @@
     "test": "node --env-file=.env test.mjs"
   },
   "dependencies": {
+    "esbuild": "^0.28.2",
     "genlayer-js": "^1.1.8",
     "viem": "^2.55.18"
-  }
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Adebisi1111/genlayer-prediction-market.git"
+  },
+  "keywords": [],
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/Adebisi1111/genlayer-prediction-market/issues"
+  },
+  "homepage": "https://github.com/Adebisi1111/genlayer-prediction-market#readme"
 }
