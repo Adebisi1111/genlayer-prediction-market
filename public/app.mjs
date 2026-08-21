@@ -6,6 +6,16 @@ let client = null;
 let account = null;
 let isConnected = false;
 
+async function updateBalance(){
+  if (!account || !window.ethereum) return;
+  try {
+    const bal = await window.ethereum.request({ method: "eth_getBalance", params: [account.address, "latest"] });
+    const gen = parseInt(bal, 16) / 1e18;
+    const el = document.getElementById('balance');
+    if (el) el.textContent = gen.toFixed(4) + " GEN";
+  } catch(e) {}
+}
+
 async function connect(){
   const b = document.getElementById('addr'), btn = document.getElementById('connectBtn');
   if (isConnected) { disconnect(); return; }
@@ -49,6 +59,9 @@ async function connect(){
     b.textContent = "Connected: " + account.address;
     btn.textContent = "Connected (tap to disconnect)";
     isConnected = true;
+    
+    // Fetch and display balance
+    await updateBalance();
   } catch(e) { 
     b.textContent = "Failed: " + e.message; 
     btn.textContent = "Connect Wallet"; 
@@ -61,6 +74,7 @@ async function connect(){
 function disconnect(){
   client = null; account = null; isConnected = false;
   document.getElementById('addr').textContent = "Not connected";
+  document.getElementById('balance').textContent = "—";
   document.getElementById('connectBtn').textContent = "Connect Wallet";
 }
 

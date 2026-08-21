@@ -37828,6 +37828,16 @@ var FACTORY = "0x6c2321c516f1793b5365Eb69d8257D6FbC885a7f";
 var client = null;
 var account = null;
 var isConnected = false;
+async function updateBalance() {
+  if (!account || !window.ethereum) return;
+  try {
+    const bal = await window.ethereum.request({ method: "eth_getBalance", params: [account.address, "latest"] });
+    const gen2 = parseInt(bal, 16) / 1e18;
+    const el = document.getElementById("balance");
+    if (el) el.textContent = gen2.toFixed(4) + " GEN";
+  } catch (e) {
+  }
+}
 async function connect2() {
   const b = document.getElementById("addr"), btn = document.getElementById("connectBtn");
   if (isConnected) {
@@ -37870,6 +37880,7 @@ async function connect2() {
     b.textContent = "Connected: " + account.address;
     btn.textContent = "Connected (tap to disconnect)";
     isConnected = true;
+    await updateBalance();
   } catch (e) {
     b.textContent = "Failed: " + e.message;
     btn.textContent = "Connect Wallet";
@@ -37883,6 +37894,7 @@ function disconnect() {
   account = null;
   isConnected = false;
   document.getElementById("addr").textContent = "Not connected";
+  document.getElementById("balance").textContent = "\u2014";
   document.getElementById("connectBtn").textContent = "Connect Wallet";
 }
 async function createMarket() {
