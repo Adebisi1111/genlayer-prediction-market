@@ -3,93 +3,313 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>PrimeX — GenLayer Prediction Markets</title>
+<title>PrimeX — Prediction Markets</title>
 <style>
-  :root{--bg:#0d1117;--panel:#161b22;--panel2:#1c2128;--border:#30363d;--butter:#e8c98a;--text:#e6edf3;--muted:#8b949e;--green:#3fb950;--red:#f85149;--blue:#58a6ff}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.5}
-  .wrap{max-width:1200px;margin:0 auto;padding:0 24px}
-  header{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid var(--border)}
-  .logo{display:flex;align-items:center;gap:12px}
-  .logo-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--butter),#c9a86a);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--bg);font-size:20px}
-  .logo-text{font-size:22px;font-weight:700}
-  .logo-badge{font-size:10px;background:var(--blue);color:#fff;padding:2px 8px;border-radius:10px;font-weight:600;margin-left:8px}
-  .nav{display:flex;align-items:center;gap:20px}
-  .nav a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500}
-  .nav a:hover{color:var(--text)}
-  .addr{font-size:13px;color:var(--butter);font-family:monospace}
-  .balance{font-size:13px;color:var(--green);font-family:monospace;font-weight:600}
-  .btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:8px;padding:10px 20px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
+  :root{
+    --bg:#0a0e14;
+    --panel:#111820;
+    --panel2:#1a2230;
+    --border:#2a3540;
+    --butter:#e8c98a;
+    --butter-dim:#c9a86a;
+    --text:#e6edf3;
+    --muted:#7a8a9a;
+    --green:#3fb950;
+    --green-bg:#0d2818;
+    --red:#f85149;
+    --red-bg:#2d0a0a;
+    --blue:#58a6ff;
+    --blue-bg:#0d1a2d;
+    --purple:#a371f7;
+    --purple-bg:#1a0d2d;
+    --orange:#f0883e;
+    --orange-bg:#2d1a0d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  /* Layout */
+  .app{display:flex;flex-direction:column;min-height:100vh}
+  .header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+  .main{flex:1;display:flex;flex-direction:column}
+  .content{flex:1;padding:24px;max-width:1400px;margin:0 auto;width:100%}
+
+  /* Header */
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--butter),var(--butter-dim));border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--bg);font-size:18px}
+  .logo-text{font-size:20px;font-weight:700}
+  .logo-badge{font-size:10px;background:var(--blue);color:#fff;padding:2px 8px;border-radius:10px;font-weight:600;margin-left:4px}
+  .header-right{display:flex;align-items:center;gap:16px}
+  .addr{font-size:13px;color:var(--butter);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace}
+  .balance{font-size:13px;color:var(--green);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600}
+  .btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:8px;padding:10px 20px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;transition:all .15s}
+  .btn:hover{filter:brightness(1.1)}
   .btn-primary{background:var(--butter);color:var(--bg)}
   .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 16px;font-size:13px;border-radius:6px;cursor:pointer}
-  .hero{padding:60px 0;text-align:center}
-  .hero h1{font-size:42px;font-weight:800;margin:0 0 16px}
-  .hero p{font-size:18px;color:var(--muted);max-width:600px;margin:0 auto 32px}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-bottom:40px}
-  .stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center}
-  .stat-value{font-size:28px;font-weight:700;color:var(--butter)}
-  .stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
-  .section{margin-bottom:40px}
+  .btn-outline:hover{background:var(--panel2)}
+
+  /* Categories */
+  .categories{display:flex;gap:8px;overflow-x:auto;padding:4px 0 24px;scrollbar-width:none}
+  .categories::-webkit-scrollbar{display:none}
+  .cat-btn{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:20px;border:1px solid var(--border);background:var(--panel);color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .15s}
+  .cat-btn:hover{border-color:var(--blue);color:var(--text)}
+  .cat-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .cat-icon{font-size:16px}
+  .cat-count{font-size:11px;background:var(--panel2);padding:2px 6px;border-radius:10px}
+  .cat-btn.active .cat-count{background:rgba(255,255,255,.2)}
+
+  /* Hero */
+  .hero{padding:40px 0;text-align:center}
+  .hero h1{font-size:36px;font-weight:800;margin-bottom:12px;background:linear-gradient(135deg,var(--text),var(--butter));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero p{color:var(--muted);font-size:16px;max-width:500px;margin:0 auto 24px}
+  .hero-stats{display:flex;justify-content:center;gap:40px;margin-top:32px}
+  .hero-stat{text-align:center}
+  .hero-stat-value{font-size:24px;font-weight:700;color:var(--butter)}
+  .hero-stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+
+  /* Markets grid */
   .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-  .section-title{font-size:24px;font-weight:700}
+  .section-title{font-size:20px;font-weight:700}
   .markets{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
-  .market{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;transition:border-color .15s}
-  .market:hover{border-color:var(--blue)}
-  .market-q{font-size:16px;font-weight:600;margin-bottom:12px;line-height:1.4}
-  .market-meta{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted)}
-  .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase}
-  .badge.OPEN{background:#0d2818;color:var(--green)}
-  .badge.RESOLVED{background:#0d1a2d;color:var(--blue)}
-  .badge.SETTLED{background:#2d1a0d;color:var(--butter)}
-  .badge.DISPUTED{background:#2d0a0a;color:var(--red)}
-  .market-pool{font-family:monospace;font-weight:600;color:var(--text)}
-  .empty{text-align:center;padding:60px;color:var(--muted)}
+  .market{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;transition:all .15s;cursor:pointer}
+  .market:hover{border-color:var(--blue);transform:translateY(-2px)}
+  .market-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+  .market-category{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.05em}
+  .cat-sports{background:var(--green-bg);color:var(--green)}
+  .cat-crypto{background:var(--orange-bg);color:var(--orange)}
+  .cat-politics{background:var(--purple-bg);color:var(--purple)}
+  .cat-news{background:var(--blue-bg);color:var(--blue)}
+  .cat-entertainment{background:var(--red-bg);color:var(--red)}
+  .cat-science{background:var(--panel2);color:var(--muted)}
+  .market-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase}
+  .status-open{background:var(--green-bg);color:var(--green)}
+  .status-resolved{background:var(--blue-bg);color:var(--blue)}
+  .status-settled{background:var(--panel2);color:var(--muted)}
+  .market-question{font-size:15px;font-weight:600;margin-bottom:16px;line-height:1.4;min-height:44px}
+  .market-options{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .market-option{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel2);border-radius:8px;font-size:13px}
+  .market-option:hover{background:var(--border)}
+  .option-name{font-weight:500}
+  .option-price{font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600;color:var(--butter)}
+  .market-footer{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--border)}
+  .market-pool{font-size:12px;color:var(--muted)}
+  .market-pool span{font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600;color:var(--text)}
+  .market-end{font-size:11px;color:var(--muted)}
+
+  /* Empty state */
+  .empty{text-align:center;padding:80px 20px;color:var(--muted)}
   .empty-icon{font-size:48px;margin-bottom:16px;opacity:.3}
-  @media(max-width:768px){.stats{grid-template-columns:repeat(2,1fr)}.hero h1{font-size:28px}.markets{grid-template-columns:1fr}}
+  .empty-text{font-size:16px;margin-bottom:8px}
+  .empty-sub{font-size:13px}
+
+  /* Responsive */
+  @media(max-width:768px){
+    .header{padding:12px 16px;flex-wrap:wrap;gap:12px}
+    .header-right{width:100%;justify-content:space-between}
+    .hero h1{font-size:28px}
+    .hero-stats{gap:20px}
+    .markets{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
+<div class="app">
+  <!-- Header -->
+  <header class="header">
     <div class="logo">
       <div class="logo-icon">P</div>
       <span class="logo-text">PrimeX</span>
       <span class="logo-badge">GenLayer</span>
     </div>
-    <div class="nav">
-      <a href="#" onclick="viewMarkets()">Markets</a>
-      <a href="#" onclick="createMarket()">Create</a>
-      <a href="#" onclick="viewLeaderboard()">Leaderboard</a>
-      <span class="addr" id="addr">Not connected</span>
+    <div class="header-right">
       <span class="balance" id="balance">—</span>
+      <span class="addr" id="addr">Not connected</span>
       <button class="btn btn-outline" id="connectBtn" onclick="connect()">Connect Wallet</button>
     </div>
   </header>
 
-  <section class="hero">
-    <h1>Predict the Future</h1>
-    <p>AI-powered prediction markets on GenLayer. Stake GEN on outcomes, verified by decentralized consensus.</p>
-    <button class="btn btn-primary" onclick="createMarket()">Create Market</button>
-  </section>
+  <!-- Main -->
+  <main class="main">
+    <div class="content">
+      <!-- Hero -->
+      <section class="hero">
+        <h1>Predict the Future</h1>
+        <p>AI-powered prediction markets. Stake GEN on outcomes, verified by decentralized consensus.</p>
+        <button class="btn btn-primary" onclick="createMarket()">Create Market</button>
+        <div class="hero-stats">
+          <div class="hero-stat"><div class="hero-stat-value" id="totalMarkets">0</div><div class="hero-stat-label">Markets</div></div>
+          <div class="hero-stat"><div class="hero-stat-value" id="totalVolume">0</div><div class="hero-stat-label">Volume (GEN)</div></div>
+          <div class="hero-stat"><div class="hero-stat-value" id="activeMarkets">0</div><div class="hero-stat-label">Active</div></div>
+        </div>
+      </section>
 
-  <div class="stats">
-    <div class="stat"><div class="stat-value" id="totalMarkets">0</div><div class="stat-label">Total Markets</div></div>
-    <div class="stat"><div class="stat-value" id="totalVolume">0</div><div class="stat-label">Total Volume (GEN)</div></div>
-    <div class="stat"><div class="stat-value" id="activeMarkets">0</div><div class="stat-label">Active Markets</div></div>
-    <div class="stat"><div class="stat-value" id="resolvedMarkets">0</div><div class="stat-label">Resolved</div></div>
-  </div>
+      <!-- Categories -->
+      <div class="categories">
+        <button class="cat-btn active" onclick="filterCategory('all')">
+          <span class="cat-icon">🔥</span> All <span class="cat-count" id="countAll">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('sports')">
+          <span class="cat-icon">⚽</span> Sports <span class="cat-count" id="countSports">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('crypto')">
+          <span class="cat-icon">₿</span> Crypto <span class="cat-count" id="countCrypto">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('politics')">
+          <span class="cat-icon">🏛️</span> Politics <span class="cat-count" id="countPolitics">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('news')">
+          <span class="cat-icon">📰</span> News <span class="cat-count" id="countNews">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('entertainment')">
+          <span class="cat-icon">🎬</span> Entertainment <span class="cat-count" id="countEnt">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('science')">
+          <span class="cat-icon">🔬</span> Science <span class="cat-count" id="countScience">0</span>
+        </button>
+      </div>
 
-  <section class="section">
-    <div class="section-header">
-      <h2 class="section-title">Active Markets</h2>
-      <button class="btn btn-outline" onclick="viewMarkets()">View All</button>
+      <!-- Markets -->
+      <section>
+        <div class="section-header">
+          <h2 class="section-title" id="sectionTitle">All Markets</h2>
+          <span style="color:var(--muted);font-size:13px" id="marketCount">0 markets</span>
+        </div>
+        <div class="markets" id="marketsList">
+          <div class="empty">
+            <div class="empty-icon">📊</div>
+            <div class="empty-text">No markets yet</div>
+            <div class="empty-sub">Be the first to create a prediction market!</div>
+          </div>
+        </div>
+      </section>
     </div>
-    <div class="markets" id="marketsList">
-      <div class="empty"><div class="empty-icon">📊</div><div>Loading markets...</div></div>
-    </div>
-  </section>
+  </main>
 </div>
 
-<script type="module" src="app.bundle.js"></script>
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/genlayer-js@1.1.8/+esm";
+import { testnetBradbury } from "https://cdn.jsdelivr.net/npm/genlayer-js@1.1.8/chains/+esm";
+
+const FACTORY = "0x6c2321c516f1793b5365Eb69d8257D6FbC885a7f";
+let client = null, account = null, isConnected = false, currentCategory = "all";
+
+// Sample markets for demo (replace with contract reads)
+const sampleMarkets = [
+  {id:"m1",q:"Will Bitcoin exceed $100,000 by end of 2026?",cat:"crypto",status:"open",pool:1250,end:"2026-12-31",options:[{name:"Yes",price:0.62},{name:"No",price:0.38}]},
+  {id:"m2",q:"Will Manchester City win the 2026 Premier League?",cat:"sports",status:"open",pool:890,end:"2026-05-31",options:[{name:"Yes",price:0.45},{name:"No",price:0.55}]},
+  {id:"m3",q:"Will the US Federal Reserve cut rates in Q1 2026?",cat:"politics",status:"open",pool:2100,end:"2026-03-31",options:[{name:"Yes",price:0.71},{name:"No",price:0.29}]},
+  {id:"m4",q:"Will Ethereum 2.0 fully launch by mid-2026?",cat:"crypto",status:"resolved",pool:3400,end:"2026-06-30",outcome:"Yes",options:[{name:"Yes",price:1.0},{name:"No",price:0.0}]},
+  {id:"m5",q:"Will Oppenheimer win Best Picture at the 2026 Oscars?",cat:"entertainment",status:"open",pool:560,end:"2026-03-15",options:[{name:"Yes",price:0.33},{name:"No",price:0.67}]},
+  {id:"m6",q:"Will SpaceX successfully land humans on Mars by 2026?",cat:"science",status:"open",pool:1800,end:"2026-12-31",options:[{name:"Yes",price:0.12},{name:"No",price:0.88}]},
+  {id:"m7",q:"Will the UK rejoin the EU by 2026?",cat:"politics",status:"open",pool:420,end:"2026-12-31",options:[{name:"Yes",price:0.08},{name:"No",price:0.92}]},
+  {id:"m8",q:"Will Apple release a foldable iPhone by end of 2026?",cat:"news",status:"open",pool:980,end:"2026-12-31",options:[{name:"Yes",price:0.54},{name:"No",price:0.46}]},
+  {id:"m9",q:"Will Argentina win the 2026 FIFA World Cup?",cat:"sports",status:"open",pool:1560,end:"2026-07-19",options:[{name:"Yes",price:0.28},{name:"No",price:0.72}]},
+  {id:"m10",q:"Will SOL flip ETH in market cap by 2026?",cat:"crypto",status:"open",pool:2200,end:"2026-12-31",options:[{name:"Yes",price:0.15},{name:"No",price:0.85}]},
+  {id:"m11",q:"Will there be a major earthquake (>7.0) in California by 2026?",cat:"science",status:"open",pool:670,end:"2026-12-31",options:[{name:"Yes",price:0.22},{name:"No",price:0.78}]},
+  {id:"m12",q:"Will Trump run for president again in 2028?",cat:"politics",status:"open",pool:890,end:"2028-11-05",options:[{name:"Yes",price:0.61},{name:"No",price:0.39}]},
+];
+
+function filterCategory(cat){
+  currentCategory = cat;
+  document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("active"));
+  event.target.closest(".cat-btn").classList.add("active");
+  renderMarkets();
+  const titles = {all:"All Markets",sports:"Sports",crypto:"Crypto",politics:"Politics",news:"News",entertainment:"Entertainment",science:"Science"};
+  document.getElementById("sectionTitle").textContent = titles[cat] || "Markets";
+}
+
+function renderMarkets(){
+  let markets = sampleMarkets;
+  if(currentCategory !== "all") markets = markets.filter(m => m.cat === currentCategory);
+  document.getElementById("marketCount").textContent = markets.length + " markets";
+  const el = document.getElementById("marketsList");
+  if(markets.length === 0){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">No markets in this category</div><div class="empty-sub">Create the first one!</div></div>';
+    return;
+  }
+  el.innerHTML = markets.map(m => `
+    <div class="market" onclick="openMarket('${m.id}')">
+      <div class="market-header">
+        <span class="market-category cat-${m.cat}">${m.cat}</span>
+        <span class="market-status status-${m.status}">${m.status}</span>
+      </div>
+      <div class="market-question">${m.q}</div>
+      <div class="market-options">
+        ${m.options.map(o => `
+          <div class="market-option">
+            <span class="option-name">${o.name}</span>
+            <span class="option-price">${(o.price*100).toFixed(0)}¢</span>
+          </div>
+        `).join("")}
+      </div>
+      <div class="market-footer">
+        <span class="market-pool">Pool: <span>${(m.pool).toLocaleString()} GEN</span></span>
+        <span class="market-end">${m.status === "resolved" ? "→ " + m.outcome : "Ends " + m.end}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function openMarket(id){
+  const m = sampleMarkets.find(x => x.id === id);
+  if(!m) return;
+  const amt = prompt(`Stake on "${m.q}"\n\nEnter amount in GEN:`);
+  if(amt && parseFloat(amt) > 0){
+    alert(`Staked ${amt} GEN on ${m.options[0].name}!\n\n(This is a demo — connect wallet to stake for real)`);
+  }
+}
+
+function createMarket(){
+  alert("Connect wallet to create a market!\n\nStake 1 GEN to create a new prediction market.");
+}
+
+async function connect(){
+  const b = document.getElementById("addr"), btn = document.getElementById("connectBtn");
+  if(isConnected){
+    client = null; account = null; isConnected = false;
+    b.textContent = "Not connected";
+    document.getElementById("balance").textContent = "—";
+    btn.textContent = "Connect Wallet";
+    return;
+  }
+  try {
+    btn.textContent = "Connecting...";
+    if(!window.ethereum){ alert("Open in MetaMask browser"); btn.textContent = "Connect Wallet"; return; }
+    let accounts = [];
+    try { accounts = await window.ethereum.request({method:"eth_accounts"}); } catch(e){}
+    if(!accounts || accounts.length === 0){
+      try { accounts = await window.ethereum.request({method:"eth_requestAccounts"}); }
+      catch(e){ alert("Please approve in MetaMask"); btn.textContent = "Connect Wallet"; return; }
+    }
+    if(!accounts || accounts.length === 0){ alert("No accounts found"); btn.textContent = "Connect Wallet"; return; }
+    client = createClient({chain:testnetBradbury});
+    await client.connect("testnetBradbury");
+    if(!client.account) client.account = {address: accounts[0]};
+    account = client.account;
+    b.textContent = "Connected: " + account.address;
+    btn.textContent = "Connected (tap to disconnect)";
+    isConnected = true;
+    const bal = await window.ethereum.request({method:"eth_getBalance",params:[account.address,"latest"]});
+    document.getElementById("balance").textContent = (parseInt(bal,16)/1e18).toFixed(4) + " GEN";
+  } catch(e){ b.textContent = "Failed: " + e.message; btn.textContent = "Connect Wallet"; }
+}
+
+// Update category counts
+document.getElementById("countAll").textContent = sampleMarkets.length;
+document.getElementById("countSports").textContent = sampleMarkets.filter(m=>m.cat==="sports").length;
+document.getElementById("countCrypto").textContent = sampleMarkets.filter(m=>m.cat==="crypto").length;
+document.getElementById("countPolitics").textContent = sampleMarkets.filter(m=>m.cat==="politics").length;
+document.getElementById("countNews").textContent = sampleMarkets.filter(m=>m.cat==="news").length;
+document.getElementById("countEnt").textContent = sampleMarkets.filter(m=>m.cat==="entertainment").length;
+document.getElementById("countScience").textContent = sampleMarkets.filter(m=>m.cat==="science").length;
+document.getElementById("totalMarkets").textContent = sampleMarkets.length;
+document.getElementById("totalVolume").textContent = sampleMarkets.reduce((a,m)=>a+m.pool,0).toLocaleString();
+document.getElementById("activeMarkets").textContent = sampleMarkets.filter(m=>m.status==="open").length;
+
+window.connect = connect;
+window.filterCategory = filterCategory;
+window.openMarket = openMarket;
+window.createMarket = createMarket;
+</script>
 </body>
 </html>
