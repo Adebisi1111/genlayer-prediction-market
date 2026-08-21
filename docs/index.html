@@ -211,8 +211,8 @@ const RPC = "https://studio.genlayer.com/api";
 // Contract ABI (only the functions we need)
 const ABI = [
   "function createMarket(string question, string rules, string marketType, string[] options, string source1, string source2, string source3) returns (string)",
-  "function getMarketsPage(uint256 page, uint256 limit) returns (tuple(string marketId, string question, string status, uint256 totalPool, string outcome)[] markets, uint256 total)",
-  function getMarket(string marketId) view returns (tuple(bool exists, string marketId, string creator, string question, string rules, string marketType, string[] options, string source1, string status, string outcome, uint256 totalPool))",
+  "function getMarketsPage(uint256 page, uint256 limit)",
+  "function getMarket(string marketId)",
   "function getConfig() view returns (uint256 marketCount)",
   "function stake(string marketId, string option) payable"
 ];
