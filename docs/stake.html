@@ -11,7 +11,6 @@
     --green:#3fb950;--green-bg:#0d2818;
     --red:#f85149;--red-bg:#2d0a0a;
     --blue:#58a6ff;--blue-bg:#0d1a2d;
-    --orange:#f0883e;--orange-bg:#2d1a0d;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5}
@@ -28,10 +27,6 @@
   .badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;text-transform:uppercase}
   .cat-crypto{background:var(--orange-bg);color:var(--orange)}
   .cat-sports{background:var(--green-bg);color:var(--green)}
-  .cat-politics{background:var(--purple-bg);color:var(--purple)}
-  .cat-news{background:var(--blue-bg);color:var(--blue)}
-  .cat-entertainment{background:var(--red-bg);color:var(--red)}
-  .cat-science{background:var(--panel2);color:var(--muted)}
   .status-open{background:var(--green-bg);color:var(--green)}
   .status-resolved{background:var(--blue-bg);color:var(--blue)}
 
@@ -81,9 +76,6 @@
   .pool-total{text-align:center;padding:16px;background:var(--panel2);border-radius:8px;margin-bottom:20px}
   .pool-total-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
   .pool-total-value{font-size:28px;font-weight:800;color:var(--butter);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace}
-
-  .connected-badge{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--green);margin-bottom:16px}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
 </style>
 </head>
 <body>
@@ -95,13 +87,8 @@
 <div class="content">
   <div class="market-question" id="q">Loading...</div>
   <div class="market-meta">
-    <span class="badge" id="catBadge">—</span>
+    <span class="badge" id="catBadge">CRYPTO</span>
     <span class="badge status-open" id="statusBadge">Open</span>
-  </div>
-
-  <div class="connected-badge" id="connBadge" style="display:none">
-    <div class="dot"></div>
-    <span>Wallet connected</span>
   </div>
 
   <div class="pool-total">
@@ -114,11 +101,11 @@
     <div class="option-btns">
       <div class="opt-btn selected" onclick="selectOpt(this,'YES')">
         <div class="opt-name">Yes</div>
-        <div class="opt-price" id="yesPrice">62¢</div>
+        <div class="opt-price" id="yesPrice">—</div>
       </div>
       <div class="opt-btn" onclick="selectOpt(this,'NO')">
         <div class="opt-name">No</div>
-        <div class="opt-price" id="noPrice">38¢</div>
+        <div class="opt-price" id="noPrice">—</div>
       </div>
     </div>
   </div>
@@ -163,37 +150,48 @@
   <button class="btn btn-win" id="stakeBtn" onclick="confirmStake()">Enter amount to stake</button>
 </div>
 
-<script>
-const state = { side: 'YES', price: 0.62, pool: 0, bal: 0, connected: false };
-const params = new URLSearchParams(window.location.search);
-const question = params.get('q');
-const category = params.get('cat');
-const pool = params.get('pool');
-const optYes = params.get('yes');
-const optNo = params.get('no');
-const mStatus = params.get('status');
-const outcome = params.get('outcome');
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/genlayer-js@1.1.8/+esm";
+import { testnetBradbury } from "https://cdn.jsdelivr.net/npm/genlayer-js@1.1.8/chains/+esm";
 
-if(question) document.getElementById('q').textContent = question;
+const FACTORY = "0x6c2321c516f1793b5365Eb69d8257D6FbC885a7f";
+let client = null, account = null, isConnected = false;
+let state = { side: 'YES', price: 0.5, pool: 0, bal: 0, marketId: '', options: ['YES','NO'] };
+
+const params = new URLSearchParams(window.location.search);
+state.marketId = params.get('id') || '';
+const q = params.get('q');
+const pool = params.get('pool');
+const yesPool = params.get('yes');
+const noPool = params.get('no');
+const status = params.get('status');
+const opts = params.get('options');
+
+if(q) document.getElementById('q').textContent = q;
 if(pool) state.pool = parseInt(pool);
-if(optYes) state.price = parseFloat(optYes)/100;
-if(optNo) document.getElementById('noPrice').textContent = optNo+'¢';
-if(optYes) document.getElementById('yesPrice').textContent = optYes+'¢';
-if(pool) document.getElementById('poolVal').textContent = parseInt(pool).toLocaleString()+' GEN';
-if(category) document.getElementById('catBadge').textContent = category;
-if(mStatus === 'resolved'){
-  document.getElementById('statusBadge').textContent = 'RESOLVED';
-  document.getElementById('statusBadge').className = 'badge status-resolved';
-  document.getElementById('stakeBtn').disabled = true;
-  document.getElementById('stakeBtn').textContent = 'Market Resolved';
-  document.getElementById('stakeBtn').style.background = 'var(--muted)';
+if(yesPool && noPool){
+  const yp = parseInt(yesPool), np = parseInt(noPool);
+  const total = yp + np;
+  state.price = total > 0 ? yp / total : 0.5;
+  document.getElementById('yesPrice').textContent = Math.round(state.price*100)+'¢';
+  document.getElementById('noPrice').textContent = Math.round((1-state.price)*100)+'¢';
+}
+if(pool) document.getElementById('poolVal').textContent = (parseInt(pool)/1e18).toFixed(2)+' GEN';
+if(status){
+  document.getElementById('statusBadge').textContent = status;
+  document.getElementById('statusBadge').className = 'badge status-'+status.toLowerCase();
+  if(status !== 'OPEN'){
+    document.getElementById('stakeBtn').disabled = true;
+    document.getElementById('stakeBtn').textContent = 'Market '+status;
+    document.getElementById('stakeBtn').style.background = 'var(--muted)';
+  }
 }
 
 function selectOpt(el, side){
   document.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('selected'));
   el.classList.add('selected');
   state.side = side;
-  state.price = side === 'YES' ? parseFloat(optYes)/100 : parseFloat(optNo)/100;
+  state.price = side === 'YES' ? parseFloat(yesPool)/(parseFloat(yesPool)+parseFloat(noPool)) : parseFloat(noPool)/(parseFloat(yesPool)+parseFloat(noPool));
   calcPayout();
 }
 
@@ -208,7 +206,7 @@ function calcPayout(){
     document.getElementById('loseAmt').textContent = '-0.00 GEN';
     document.getElementById('losePct').textContent = '-100%';
     document.getElementById('dStake').textContent = '0.00 GEN';
-    document.getElementById('dPool').textContent = state.pool.toLocaleString()+' GEN';
+    document.getElementById('dPool').textContent = (state.pool/1e18).toFixed(2)+' GEN';
     document.getElementById('dProfit').textContent = '+0.00 GEN';
     document.getElementById('dLoss').textContent = '-0.00 GEN';
     document.getElementById('dRoi').textContent = '0%';
@@ -216,18 +214,19 @@ function calcPayout(){
     document.getElementById('stakeBtn').disabled = true;
     return;
   }
-  const newPool = state.pool + amt;
-  const winningPool = (state.side === 'YES' ? state.pool * state.price : state.pool * (1-state.price)) + amt;
-  const payout = amt * newPool / winningPool;
-  const profit = payout - amt;
-  const roi = ((payout - amt) / amt * 100).toFixed(0);
-  document.getElementById('winAmt').textContent = '+'+payout.toFixed(2)+' GEN';
+  const pool = state.pool;
+  const newPool = pool + amt*1e18;
+  const winningPool = (state.side === 'YES' ? pool * state.price : pool * (1-state.price)) + amt*1e18;
+  const payout = amt*1e18 * newPool / winningPool;
+  const profit = payout - amt*1e18;
+  const roi = ((payout - amt*1e18) / (amt*1e18) * 100).toFixed(0);
+  document.getElementById('winAmt').textContent = '+'+(payout/1e18).toFixed(2)+' GEN';
   document.getElementById('winPct').textContent = '+'+roi+'%';
   document.getElementById('loseAmt').textContent = '-'+amt.toFixed(2)+' GEN';
   document.getElementById('losePct').textContent = '-100%';
   document.getElementById('dStake').textContent = amt.toFixed(2)+' GEN';
-  document.getElementById('dPool').textContent = newPool.toLocaleString()+' GEN';
-  document.getElementById('dProfit').textContent = '+'+profit.toFixed(2)+' GEN';
+  document.getElementById('dPool').textContent = (newPool/1e18).toFixed(2)+' GEN';
+  document.getElementById('dProfit').textContent = '+'+(profit/1e18).toFixed(2)+' GEN';
   document.getElementById('dLoss').textContent = '-'+amt.toFixed(2)+' GEN';
   document.getElementById('dRoi').textContent = roi+'%';
   document.getElementById('stakeBtn').textContent = 'Stake '+amt.toFixed(2)+' GEN on '+state.side;
@@ -239,11 +238,16 @@ async function confirmStake(){
   const amt = parseFloat(document.getElementById('amt').value) || 0;
   if(amt <= 0) return;
   if(amt > state.bal) return;
-  if(!state.connected){
-    alert('Please connect your wallet first');
-    return;
-  }
-  alert('Staked '+amt+' GEN on '+state.side+'!\n\n(This is a demo — connect wallet to stake for real)');
+  if(!isConnected) return alert('Please connect your wallet first');
+  try {
+    const tx = await client.writeContract({
+      address: FACTORY, functionName: "stake",
+      args: [state.marketId, state.side],
+      value: BigInt(Math.floor(amt * 1e18)),
+    });
+    const q = encodeURIComponent(document.getElementById('q').textContent);
+    window.location.href = `success.html?q=${q}&side=${state.side}&amt=${amt}&tx=${tx}`;
+  } catch(e) { alert("Error: " + e.message); }
 }
 
 async function checkConnection(){
@@ -251,11 +255,16 @@ async function checkConnection(){
   try {
     const accounts = await window.ethereum.request({method:"eth_accounts"});
     if(accounts && accounts.length > 0){
+      isConnected = true;
       state.connected = true;
+      account = {address: accounts[0]};
       const bal = await window.ethereum.request({method:"eth_getBalance",params:[accounts[0],"latest"]});
       state.bal = parseInt(bal,16)/1e18;
       document.getElementById('balance').textContent = state.bal.toFixed(4)+' GEN';
-      document.getElementById('connBadge').style.display = 'flex';
+      client = createClient({chain:testnetBradbury});
+      await client.connect("testnetBradbury");
+      if(!client.account) client.account = {address: accounts[0]};
+      calcPayout();
     }
   } catch(e) {}
 }

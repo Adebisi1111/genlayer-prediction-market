@@ -29,6 +29,7 @@
   .balance{font-size:13px;color:var(--green);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600}
   .btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:8px;padding:10px 20px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
   .btn:hover{filter:brightness(1.1)}
+  .btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
   .btn-primary{background:var(--butter);color:var(--bg)}
   .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 16px;font-size:13px;border-radius:6px;cursor:pointer}
   .btn-outline:hover{background:var(--panel2)}
@@ -67,6 +68,7 @@
   .status-open{background:var(--green-bg);color:var(--green)}
   .status-resolved{background:var(--blue-bg);color:var(--blue)}
   .status-settled{background:var(--panel2);color:var(--muted)}
+  .status-disputed{background:var(--orange-bg);color:var(--orange)}
   .market-question{font-size:15px;font-weight:600;margin-bottom:16px;line-height:1.4;min-height:44px}
   .market-options{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
   .market-option{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel2);border-radius:8px;font-size:13px}
@@ -108,7 +110,7 @@
       <section class="hero">
         <h1>Predict the Future</h1>
         <p>All prediction markets. Stake GEN on outcomes, verified by decentralized consensus.</p>
-        <button class="btn btn-primary" onclick="createMarket()">Create Market</button>
+        <button class="btn btn-primary" onclick="showCreate()">Create Market</button>
         <div class="hero-stats">
           <div class="hero-stat"><div class="hero-stat-value" id="totalMarkets">0</div><div class="hero-stat-label">Markets</div></div>
           <div class="hero-stat"><div class="hero-stat-value" id="totalVolume">0</div><div class="hero-stat-label">Volume (GEN)</div></div>
@@ -117,27 +119,13 @@
       </section>
 
       <div class="categories">
-        <button class="cat-btn active" onclick="filterCategory('all')">
-          <span class="cat-icon">🔥</span> All <span class="cat-count" id="countAll">0</span>
-        </button>
-        <button class="cat-btn" onclick="filterCategory('sports')">
-          <span class="cat-icon">⚽</span> Sports <span class="cat-count" id="countSports">0</span>
-        </button>
-        <button class="cat-btn" onclick="filterCategory('crypto')">
-          <span class="cat-icon">₿</span> Crypto <span class="cat-count" id="countCrypto">0</span>
-        </button>
-        <button class="cat-btn" onclick="filterCategory('politics')">
-          <span class="cat-icon">🏛️</span> Politics <span class="cat-count" id="countPolitics">0</span>
-        </button>
-        <button class="cat-btn" onclick="filterCategory('news')">
-          <span class="cat-icon">📰</span> News <span class="cat-count" id="countNews">0</span>
-        </button>
-        <button class="cat-btn" onclick="filterCategory('entertainment')">
-          <span class="cat-icon">🎬</span> Entertainment <span class="cat-count" id="countEnt">0</span>
-        </button>
-        <button class="cat-btn" onclick="filterCategory('science')">
-          <span class="cat-icon">🔬</span> Science <span class="cat-count" id="countScience">0</span>
-        </button>
+        <button class="cat-btn active" onclick="filterCategory('all',this)">🔥 All <span class="cat-count" id="countAll">0</span></button>
+        <button class="cat-btn" onclick="filterCategory('sports',this)">⚽ Sports <span class="cat-count" id="countSports">0</span></button>
+        <button class="cat-btn" onclick="filterCategory('crypto',this)">₿ Crypto <span class="cat-count" id="countCrypto">0</span></button>
+        <button class="cat-btn" onclick="filterCategory('politics',this)">🏛️ Politics <span class="cat-count" id="countPolitics">0</span></button>
+        <button class="cat-btn" onclick="filterCategory('news',this)">📰 News <span class="cat-count" id="countNews">0</span></button>
+        <button class="cat-btn" onclick="filterCategory('entertainment',this)">🎬 Ent. <span class="cat-count" id="countEnt">0</span></button>
+        <button class="cat-btn" onclick="filterCategory('science',this)">🔬 Science <span class="cat-count" id="countScience">0</span></button>
       </div>
 
       <section>
@@ -146,7 +134,7 @@
           <span style="color:var(--muted);font-size:13px" id="marketCount">0 markets</span>
         </div>
         <div class="markets" id="marketsList">
-          <div class="empty"><div class="empty-icon">📊</div><div>No markets yet</div></div>
+          <div class="empty"><div class="empty-icon">📊</div><div>Loading markets...</div></div>
         </div>
       </section>
     </div>
@@ -159,72 +147,6 @@ import { testnetBradbury } from "https://cdn.jsdelivr.net/npm/genlayer-js@1.1.8/
 
 const FACTORY = "0x6c2321c516f1793b5365Eb69d8257D6FbC885a7f";
 let client = null, account = null, isConnected = false, currentCategory = "all";
-
-const sampleMarkets = [
-  {id:"m1",q:"Will Bitcoin exceed $100,000 by end of 2026?",cat:"crypto",status:"open",pool:1250,end:"2026-12-31",options:[{name:"Yes",price:0.62},{name:"No",price:0.38}]},
-  {id:"m2",q:"Will Manchester City win the 2026 Premier League?",cat:"sports",status:"open",pool:890,end:"2026-05-31",options:[{name:"Yes",price:0.45},{name:"No",price:0.55}]},
-  {id:"m3",q:"Will the US Federal Reserve cut rates in Q1 2026?",cat:"politics",status:"open",pool:2100,end:"2026-03-31",options:[{name:"Yes",price:0.71},{name:"No",price:0.29}]},
-  {id:"m4",q:"Will Ethereum 2.0 fully launch by mid-2026?",cat:"crypto",status:"resolved",pool:3400,end:"2026-06-30",outcome:"Yes",options:[{name:"Yes",price:1.0},{name:"No",price:0.0}]},
-  {id:"m5",q:"Will Oppenheimer win Best Picture at the 2026 Oscars?",cat:"entertainment",status:"open",pool:560,end:"2026-03-15",options:[{name:"Yes",price:0.33},{name:"No",price:0.67}]},
-  {id:"m6",q:"Will SpaceX successfully land humans on Mars by 2026?",cat:"science",status:"open",pool:1800,end:"2026-12-31",options:[{name:"Yes",price:0.12},{name:"No",price:0.88}]},
-  {id:"m7",q:"Will the UK rejoin the EU by 2026?",cat:"politics",status:"open",pool:420,end:"2026-12-31",options:[{name:"Yes",price:0.08},{name:"No",price:0.92}]},
-  {id:"m8",q:"Will Apple release a foldable iPhone by end of 2026?",cat:"news",status:"open",pool:980,end:"2026-12-31",options:[{name:"Yes",price:0.54},{name:"No",price:0.46}]},
-  {id:"m9",q:"Will Argentina win the 2026 FIFA World Cup?",cat:"sports",status:"open",pool:1560,end:"2026-07-19",options:[{name:"Yes",price:0.28},{name:"No",price:0.72}]},
-  {id:"m10",q:"Will SOL flip ETH in market cap by 2026?",cat:"crypto",status:"open",pool:2200,end:"2026-12-31",options:[{name:"Yes",price:0.15},{name:"No",price:0.85}]},
-  {id:"m11",q:"Will there be a major earthquake (>7.0) in California by 2026?",cat:"science",status:"open",pool:670,end:"2026-12-31",options:[{name:"Yes",price:0.22},{name:"No",price:0.78}]},
-  {id:"m12",q:"Will Trump run for president again in 2028?",cat:"politics",status:"open",pool:890,end:"2028-11-05",options:[{name:"Yes",price:0.61},{name:"No",price:0.39}]},
-];
-
-function filterCategory(cat){
-  currentCategory = cat;
-  document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("active"));
-  event.target.closest(".cat-btn").classList.add("active");
-  renderMarkets();
-  const titles = {all:"All Markets",sports:"Sports",crypto:"Crypto",politics:"Politics",news:"News",entertainment:"Entertainment",science:"Science"};
-  document.getElementById("sectionTitle").textContent = titles[cat] || "Markets";
-}
-
-function renderMarkets(){
-  let markets = sampleMarkets;
-  if(currentCategory !== "all") markets = markets.filter(m => m.cat === currentCategory);
-  document.getElementById("marketCount").textContent = markets.length + " markets";
-  const el = document.getElementById("marketsList");
-  if(markets.length === 0){
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>No markets in this category</div></div>';
-    return;
-  }
-  el.innerHTML = markets.map(m => `
-    <div class="market" onclick="openMarket('${m.id}')">
-      <div class="market-header">
-        <span class="market-category cat-${m.cat}">${m.cat}</span>
-        <span class="market-status status-${m.status}">${m.status}</span>
-      </div>
-      <div class="market-question">${m.q}</div>
-      <div class="market-options">
-        ${m.options.map(o => `
-          <div class="market-option">
-            <span class="option-name">${o.name}</span>
-            <span class="option-price">${(o.price*100).toFixed(0)}¢</span>
-          </div>
-        `).join("")}
-      </div>
-      <div class="market-footer">
-        <span class="market-pool">Pool: <span>${(m.pool).toLocaleString()} GEN</span></span>
-        <span class="market-end">${m.status === "resolved" ? "→ " + m.outcome : "Ends " + m.end}</span>
-      </div>
-    </div>
-  `).join("");
-}
-
-function openMarket(id){
-  const m = sampleMarkets.find(x => x.id === id);
-  if(!m) return;
-  window.location.href = `stake.html?q=${encodeURIComponent(m.q)}&cat=${m.cat}&pool=${m.pool}&yes=${(m.options[0].price*100).toFixed(0)}&no=${(m.options[1].price*100).toFixed(0)}&status=${m.status}&outcome=${m.outcome||''}`;
-}
-
-function createMarket(){
-  alert("Connect wallet to create a market!\n\nStake 1 GEN to create a new prediction market.");
-}
 
 async function connect(){
   const b = document.getElementById("addr"), btn = document.getElementById("connectBtn");
@@ -254,24 +176,96 @@ async function connect(){
     isConnected = true;
     const bal = await window.ethereum.request({method:"eth_getBalance",params:[account.address,"latest"]});
     document.getElementById("balance").textContent = (parseInt(bal,16)/1e18).toFixed(4) + " GEN";
+    loadMarkets();
   } catch(e){ b.textContent = "Failed: " + e.message; btn.textContent = "Connect Wallet"; }
 }
 
-document.getElementById("countAll").textContent = sampleMarkets.length;
-document.getElementById("countSports").textContent = sampleMarkets.filter(m=>m.cat==="sports").length;
-document.getElementById("countCrypto").textContent = sampleMarkets.filter(m=>m.cat==="crypto").length;
-document.getElementById("countPolitics").textContent = sampleMarkets.filter(m=>m.cat==="politics").length;
-document.getElementById("countNews").textContent = sampleMarkets.filter(m=>m.cat==="news").length;
-document.getElementById("countEnt").textContent = sampleMarkets.filter(m=>m.cat==="entertainment").length;
-document.getElementById("countScience").textContent = sampleMarkets.filter(m=>m.cat==="science").length;
-document.getElementById("totalMarkets").textContent = sampleMarkets.length;
-document.getElementById("totalVolume").textContent = sampleMarkets.reduce((a,m)=>a+m.pool,0).toLocaleString();
-document.getElementById("activeMarkets").textContent = sampleMarkets.filter(m=>m.status==="open").length;
+async function loadMarkets(){
+  if(!client){
+    document.getElementById("marketsList").innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>Connect wallet to see markets</div></div>';
+    return;
+  }
+  try {
+    const data = await client.readContract({address: FACTORY, functionName: "getMarketsPage", args:[1,20]});
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    const markets = result.markets || [];
+    const el = document.getElementById("marketsList");
+    if(markets.length === 0){
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>No markets yet. Create the first one!</div></div>';
+    } else {
+      el.innerHTML = markets.map(m => `
+        <div class="market" onclick="openMarket('${m.market_id}')">
+          <div class="market-header">
+            <span class="market-category cat-${(m.category||'crypto').toLowerCase()}">${m.category||'CRYPTO'}</span>
+            <span class="market-status status-${m.status.toLowerCase()}">${m.status}</span>
+          </div>
+          <div class="market-question">${m.question}</div>
+          <div class="market-footer">
+            <span class="market-pool">Pool: <span>${(m.total_pool/1e18).toFixed(2)} GEN</span></span>
+            <span class="market-end">${m.outcome ? '→ '+m.outcome : ''}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+    document.getElementById("totalMarkets").textContent = result.total || 0;
+    document.getElementById("marketCount").textContent = markets.length + " markets";
+  } catch(e){
+    document.getElementById("marketsList").innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>Error loading markets: '+e.message+'</div></div>';
+  }
+}
+
+async function showCreate(){
+  if(!isConnected) return alert("Connect wallet first");
+  const q = prompt("Question:");
+  if(!q) return;
+  const r = prompt("Resolution rules:");
+  if(!r) return;
+  const s1 = prompt("Source URL 1:");
+  if(!s1) return;
+  const s2 = prompt("Source URL 2 (optional):") || "";
+  const s3 = prompt("Source URL 3 (optional):") || "";
+  try {
+    const tx = await client.writeContract({
+      address: FACTORY, functionName: "createMarket",
+      args: [q, r, "BINARY", ["YES","NO"], s1, s2, s3],
+      value: 1000000000000000000n,
+    });
+    alert("Market created! Tx: " + tx);
+    loadMarkets();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function openMarket(id){
+  if(!isConnected) return alert("Connect wallet first");
+  try {
+    const data = await client.readContract({address: FACTORY, functionName: "getMarket", args:[id]});
+    const m = typeof data === 'string' ? JSON.parse(data) : data;
+    if(!m.exists) return alert("Market not found");
+    window.location.href = `stake.html?id=${m.market_id}&q=${encodeURIComponent(m.question)}&pool=${m.total_pool}&yes=${m.pools.YES||0}&no=${m.pools.NO||0}&status=${m.status}&options=${encodeURIComponent(JSON.stringify(m.options))}`;
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+function filterCategory(cat, btn){
+  currentCategory = cat;
+  document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  const titles = {all:"All Markets",sports:"Sports",crypto:"Crypto",politics:"Politics",news:"News",entertainment:"Entertainment",science:"Science"};
+  document.getElementById("sectionTitle").textContent = titles[cat] || "Markets";
+  loadMarkets();
+}
 
 window.connect = connect;
-window.filterCategory = filterCategory;
+window.loadMarkets = loadMarkets;
+window.showCreate = showCreate;
 window.openMarket = openMarket;
-window.createMarket = createMarket;
+window.filterCategory = filterCategory;
+
+// Auto-load if connected
+if(window.ethereum){
+  window.ethereum.request({method:"eth_accounts"}).then(accounts=>{
+    if(accounts && accounts.length > 0) connect();
+  });
+}
 </script>
 </body>
 </html>
