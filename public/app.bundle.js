@@ -37841,11 +37841,14 @@ async function connect2() {
       btn.textContent = "Connect Wallet";
       return;
     }
+    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    if (!accounts || accounts.length === 0) {
+      throw new Error("No accounts found. Please unlock MetaMask.");
+    }
     client = createClient2({ chain: testnetBradbury });
     await client.connect("testnetBradbury");
     if (!client.account) {
-      const [a] = await window.ethereum.request({ method: "eth_requestAccounts" });
-      client.account = { address: a };
+      client.account = { address: accounts[0] };
     }
     account = client.account;
     b.textContent = "Connected: " + account.address;
@@ -37854,6 +37857,9 @@ async function connect2() {
   } catch (e) {
     b.textContent = "Failed: " + e.message;
     btn.textContent = "Connect Wallet";
+    if (e.message && e.message.includes("already pending")) {
+      alert("A wallet request is pending. Please check MetaMask and approve or reject the request.");
+    }
   }
 }
 function disconnect() {
