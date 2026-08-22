@@ -167,7 +167,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <script>
 const FACTORY = "0xDD457e0F2FfE7B843f8C90f7997DB06714666CC9";
-const RPC = "https://rpc-bradbury.genlayer.com";
 const EXPLORER = "https://explorer-bradbury.genlayer.com/tx/";
 
 const ABI = [
@@ -176,7 +175,7 @@ const ABI = [
 ];
 
 let provider = null, signer = null, contract = null, isConnected = false;
-let state = { side: 'YES', price: 0.62, pool: 0, bal: 0, marketId: '', options: ['YES','NO'] };
+let state = { side: 'YES', price: 0.62, pool: 0, bal: 0, marketId: '' };
 
 // Parse URL params
 const params = new URLSearchParams(window.location.search);
@@ -195,15 +194,15 @@ if(cat) {
   badge.textContent = cat.toUpperCase();
   badge.className = 'badge cat-' + cat;
 }
-if(pool) state.pool = parseInt(pool);
+if(pool) state.pool = parseFloat(pool);
 if(yesPool && noPool){
-  const yp = parseInt(yesPool), np = parseInt(noPool);
+  const yp = parseFloat(yesPool), np = parseFloat(noPool);
   const total = yp + np;
   state.price = total > 0 ? yp / total : 0.5;
   document.getElementById('yesPrice').textContent = Math.round(state.price*100)+'¢';
   document.getElementById('noPrice').textContent = Math.round((1-state.price)*100)+'¢';
 }
-if(pool) document.getElementById('poolVal').textContent = (parseInt(pool)/1e18).toFixed(2)+' GEN';
+if(pool) document.getElementById('poolVal').textContent = parseFloat(pool).toFixed(2)+' GEN';
 if(status){
   document.getElementById('statusBadge').textContent = status;
   document.getElementById('statusBadge').className = 'badge status-'+status.toLowerCase();
@@ -218,7 +217,6 @@ function selectOpt(el, side){
   document.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('selected'));
   el.classList.add('selected');
   state.side = side;
-  state.price = side === 'YES' ? parseFloat(yesPool)/(parseFloat(yesPool)+parseFloat(noPool)) : parseFloat(noPool)/(parseFloat(yesPool)+parseFloat(noPool));
   calcPayout();
 }
 
@@ -227,13 +225,13 @@ function setPct(p){ document.getElementById('amt').value = (state.bal * p / 100)
 
 function calcPayout(){
   const amt = parseFloat(document.getElementById('amt').value) || 0;
-  if(amt <= 0){
+  if(amt <= 0 || state.pool <= 0){
     document.getElementById('winAmt').textContent = '+0.00 GEN';
     document.getElementById('winPct').textContent = '+0%';
     document.getElementById('loseAmt').textContent = '-0.00 GEN';
     document.getElementById('losePct').textContent = '-100%';
     document.getElementById('dStake').textContent = '0.00 GEN';
-    document.getElementById('dPool').textContent = (state.pool/1e18).toFixed(2)+' GEN';
+    document.getElementById('dPool').textContent = state.pool.toFixed(2)+' GEN';
     document.getElementById('dProfit').textContent = '+0.00 GEN';
     document.getElementById('dLoss').textContent = '-0.00 GEN';
     document.getElementById('dRoi').textContent = '0%';
@@ -241,19 +239,25 @@ function calcPayout(){
     document.getElementById('stakeBtn').disabled = true;
     return;
   }
+  
+  // Parimutuel payout calculation (all values in GEN)
   const pool = state.pool;
-  const newPool = pool + amt*1e18;
-  const winningPool = (state.side === 'YES' ? pool * state.price : pool * (1-state.price)) + amt*1e18;
-  const payout = amt*1e18 * newPool / winningPool;
-  const profit = payout - amt*1e18;
-  const roi = ((payout - amt*1e18) / (amt*1e18) * 100).toFixed(0);
-  document.getElementById('winAmt').textContent = '+'+(payout/1e18).toFixed(2)+' GEN';
+  const newPool = pool + amt;
+  const yesPoolAmt = pool * (parseFloat(yesPool)/100);
+  const noPoolAmt = pool * (parseFloat(noPool)/100);
+  const winningPool = state.side === 'YES' ? yesPoolAmt + amt : noPoolAmt + amt;
+  
+  const payout = amt * newPool / winningPool;
+  const profit = payout - amt;
+  const roi = ((payout - amt) / amt * 100).toFixed(0);
+  
+  document.getElementById('winAmt').textContent = '+'+payout.toFixed(2)+' GEN';
   document.getElementById('winPct').textContent = '+'+roi+'%';
   document.getElementById('loseAmt').textContent = '-'+amt.toFixed(2)+' GEN';
   document.getElementById('losePct').textContent = '-100%';
   document.getElementById('dStake').textContent = amt.toFixed(2)+' GEN';
-  document.getElementById('dPool').textContent = (newPool/1e18).toFixed(2)+' GEN';
-  document.getElementById('dProfit').textContent = '+'+(profit/1e18).toFixed(2)+' GEN';
+  document.getElementById('dPool').textContent = newPool.toFixed(2)+' GEN';
+  document.getElementById('dProfit').textContent = '+'+profit.toFixed(2)+' GEN';
   document.getElementById('dLoss').textContent = '-'+amt.toFixed(2)+' GEN';
   document.getElementById('dRoi').textContent = roi+'%';
   document.getElementById('stakeBtn').textContent = 'Stake '+amt.toFixed(2)+' GEN on '+state.side;
