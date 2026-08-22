@@ -316,7 +316,10 @@ function renderMarket(m){
 }
 
 function openMarket(id){
-  alert("Market: " + id + "\n\n(Staking page coming soon)");
+  // Find market in sample data
+  const m = sampleMarkets.find(x => x.id === id);
+  if(!m) return alert("Market not found");
+  window.location.href = `stake.html?id=${m.id}&q=${encodeURIComponent(m.question)}&cat=${m.category}&pool=${m.totalPool}&yes=62&no=38&status=${m.status}`;
 }
 
 function filterCategory(cat, btn){
