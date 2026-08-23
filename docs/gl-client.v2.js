@@ -34,6 +34,7 @@ import { createClient } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
 export const FACTORY = '0xF8bf266694Cc729d9e1032e9dA244febfE10b335';
+export const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 export const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 export const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
 export const CHAIN_ID_HEX = '0x107d'; // 4221
@@ -186,6 +187,102 @@ export function previewPayout(market, side, stakeGen) {
     roi: Object.is(roi, -0) ? 0 : roi,
     opposing,
     oneSided: opposing <= 0,
+  };
+}
+
+/** Settlement payouts for a resolved/settled market.
+ *
+ * Parimutuel: each winner receives their share of the WHOLE pool in proportion
+ * to their stake on the winning side. Losers receive nothing. Unlike
+ * previewPayout (which models adding new money), this settles existing stakes.
+ *
+ * Multiple stakes by the same wallet are AGGREGATED — the on-chain v15 claim
+ * had a bug where it stopped at the first match, underpaying repeat stakers.
+ */
+export function settlementPayouts(market) {
+  const outcome = market.outcome;
+  if (!outcome || (market.status !== 'SETTLED' && market.status !== 'RESOLVED')) return [];
+
+  // Aggregate per address per side.
+  const byAddr = new Map();
+  for (const h of market.holders) {
+    const k = h.address.toLowerCase();
+    const cur = byAddr.get(k) || { address: h.address, yes: 0, no: 0 };
+    if (h.side === 'YES') cur.yes += h.amount; else if (h.side === 'NO') cur.no += h.amount;
+    byAddr.set(k, cur);
+  }
+
+  const winningPool = outcome === 'YES' ? market.yes : market.no;
+
+  const rows = [];
+  for (const v of byAddr.values()) {
+    const won = outcome === 'YES' ? v.yes : v.no;
+    const lost = outcome === 'YES' ? v.no : v.yes;
+    const staked = v.yes + v.no;
+    const payout = winningPool > 0 && won > 0 ? (won * market.pool) / winningPool : 0;
+    rows.push({
+      address: v.address,
+      staked,
+      winningStake: won,
+      losingStake: lost,
+      payout,
+      profit: payout - staked,
+      share: winningPool > 0 ? won / winningPool : 0,
+      isWinner: won > 0,
+    });
+  }
+  rows.sort((a, b) => b.payout - a.payout);
+  return rows;
+}
+
+/** Raw JSON-RPC helper (read-only, no wallet needed). */
+async function rpc(method, params) {
+  const res = await fetch(RPC_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  const j = await res.json();
+  if (j.error) throw new Error(j.error.message);
+  return j.result;
+}
+
+/** Live GEN balance of any address — proves stakes are really escrowed. */
+export async function addressBalance(addr) {
+  const hex = await rpc('eth_getBalance', [addr, 'latest']);
+  return Number(BigInt(hex)) / 1e18;
+}
+
+/** Fetch a tx and extract any emitted value-transfer messages.
+ *
+ * A claim returns FINISHED_WITH_RETURN once the transfer is EMITTED. The
+ * emitted message is the on-chain evidence of the payout instruction:
+ *   { messageType: 1, recipient, value, onAcceptance }
+ * On Bradbury these settle at finalization, which lags acceptance — so we
+ * report the emission AND the live tx status honestly.
+ *
+ * NOTE: tx data is NOT available over a plain JSON-RPC method. genlayer-js
+ * reads it from the ConsensusData contract (getTransactionData /
+ * getTransactionAllData), so we must go through the client, not fetch().
+ * `gen_getTransactionByHash` and `gen_getTransactionsForAddress` do not exist.
+ */
+export async function transferEvidence(hash) {
+  // A read-only client works without a connected wallet.
+  const c = client || createClient({ chain: testnetBradbury });
+  const tx = await c.getTransaction({ hash });
+  if (!tx) return null;
+  const msgs = (tx.messages || [])
+    .filter((m) => m.value && BigInt(m.value) > 0n)
+    .map((m) => ({
+      recipient: m.recipient,
+      gen: Number(BigInt(m.value)) / 1e18,
+      onAcceptance: !!m.onAcceptance,
+    }));
+  return {
+    hash,
+    status: tx.statusName || String(tx.status),
+    exec: tx.txExecutionResultName,
+    transfers: msgs,
   };
 }
 

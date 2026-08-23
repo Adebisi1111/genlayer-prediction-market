@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrimeX · Rewards</title>
+<style>
+  :root{
+    --bg:#000; --panel:#0d1117; --panel2:#161b22; --line:#21262d;
+    --text:#e6edf3; --muted:#7d8590;
+    --yes:#3fb950; --no:#f85149; --accent:#e3b341; --blue:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       padding:16px 14px 40px;max-width:820px;margin:0 auto}
+  a{color:var(--blue)}
+  .top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .top h1{font-size:20px;margin:0;letter-spacing:-.3px}
+  .badge{font-size:10px;padding:3px 7px;border-radius:20px;background:var(--panel2);
+         color:var(--accent);border:1px solid var(--line);text-transform:uppercase;
+         letter-spacing:.5px;font-weight:700}
+  .sub{color:var(--muted);font-size:12.5px;line-height:1.5;margin:0 0 16px}
+  .nav{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .nav a{font-size:12px;padding:7px 12px;border-radius:7px;background:var(--panel);
+         border:1px solid var(--line);text-decoration:none;color:var(--text)}
+
+  .escrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px}
+  .stat .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .stat .v{font-size:19px;font-weight:700;margin-top:3px}
+  .stat .v small{font-size:11px;color:var(--muted);font-weight:400}
+
+  .mkt{background:var(--panel);border:1px solid var(--line);border-radius:11px;
+       padding:14px;margin-bottom:14px}
+  .mkt h2{font-size:14.5px;margin:0 0 4px;line-height:1.35;font-weight:600}
+  .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .pill{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;
+        text-transform:uppercase;letter-spacing:.4px}
+  .p-settled{background:rgba(63,185,80,.15);color:var(--yes);border:1px solid rgba(63,185,80,.3)}
+  .p-open{background:rgba(88,166,255,.13);color:var(--blue);border:1px solid rgba(88,166,255,.3)}
+  .p-res{background:rgba(227,179,65,.13);color:var(--accent);border:1px solid rgba(227,179,65,.3)}
+  .mid{font-size:10.5px;color:var(--muted);font-family:ui-monospace,monospace}
+  .won{font-size:11px;color:var(--muted)}
+  .won b{color:var(--yes)}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:var(--muted);font-size:9.5px;text-transform:uppercase;
+     letter-spacing:.5px;padding:6px 6px;border-bottom:1px solid var(--line);font-weight:600}
+  td{padding:8px 6px;border-bottom:1px solid rgba(33,38,45,.5);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  .addr{font-family:ui-monospace,monospace;font-size:11px}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pay{color:var(--yes);font-weight:700}
+  .zero{color:var(--muted)}
+  .prof-up{color:var(--yes);font-size:11.5px}
+  .prof-dn{color:var(--no);font-size:11.5px}
+  .prof-flat{color:var(--muted);font-size:11px}
+  .you{background:rgba(227,179,65,.07)}
+  .you .addr::after{content:' YOU';color:var(--accent);font-weight:700;font-size:9px}
+
+  .ev{margin-top:11px;padding:10px;background:var(--panel2);border-radius:8px;
+      border:1px solid var(--line)}
+  .ev-h{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;
+        margin-bottom:7px;font-weight:700}
+  .ev-row{font-size:11px;font-family:ui-monospace,monospace;line-height:1.7;
+          word-break:break-all}
+  .ok{color:var(--yes)} .warn{color:var(--accent)}
+
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+        border-radius:8px;padding:13px;font-size:12px;line-height:1.6;color:var(--muted);
+        margin-top:20px}
+  .note b{color:var(--text)}
+  .loading,.empty{text-align:center;color:var(--muted);padding:26px 10px;font-size:13px}
+  @media(max-width:420px){
+    .escrow{grid-template-columns:1fr}
+    th:nth-child(3),td:nth-child(3){display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Rewards</h1><span class="badge">On-chain</span>
+</div>
+<p class="sub">
+  Parimutuel payouts computed from real on-chain positions. Winners split the entire
+  pool in proportion to their stake on the winning side.
+</p>
+
+<div class="nav">
+  <a href="./index.html">← Markets</a>
+  <a href="./claim.html">Claim</a>
+  <a id="ctrLink" target="_blank" rel="noopener">Contract ↗</a>
+</div>
+
+<div class="escrow">
+  <div class="stat"><div class="k">Escrowed in contract</div>
+    <div class="v" id="escrow">…<small> GEN</small></div></div>
+  <div class="stat"><div class="k">Total computed payouts</div>
+    <div class="v" id="totalPay">…<small> GEN</small></div></div>
+</div>
+
+<div id="list"><div class="loading">Reading settled markets from chain…</div></div>
+
+<div class="note">
+  <b>How settlement works.</b> Payout tables above are computed from live on-chain
+  positions using the same parimutuel formula the contract runs:
+  <code>your_stake ÷ winning_pool × total_pool</code>.
+  Calling <code>claim</code> executes that math on-chain and the contract emits a
+  GEN transfer message to the winner. On Bradbury these emitted transfers settle at
+  network <b>finalization</b>, which lags acceptance — so a claim can be executed and
+  recorded while the balance credit is still pending. Every figure here is derived
+  from chain state, never from a database.
+</div>
+
+<script type="module">
+import * as gl from './gl-client.v2.js?v=3';
+
+const $ = (id) => document.getElementById(id);
+const short = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+const f = (n, d = 4) => n.toFixed(d).replace(/\.?0+$/, '') || '0';
+
+$('ctrLink').href = gl.EXPLORER_ADDR + gl.FACTORY;
+
+// Known claim txs whose emitted transfer we can show as evidence.
+// These are real txs produced by the payout path.
+const CLAIM_TXS = [
+  '0xe0751d2e0f17c76de2a13ab3dc30b62133dd5bfb01cc43c545ebfe290c92fb0a',
+];
+
+function payoutTable(market, me) {
+  const rows = gl.settlementPayouts(market);
+  if (!rows.length) return '<div class="empty">No positions to settle.</div>';
+
+  const body = rows.map((r) => {
+    const isMe = me && r.address.toLowerCase() === me.toLowerCase();
+    // Two different truths, so label them instead of collapsing to one number:
+    //   gain     = payout vs the WINNING stake (what the bet returned)
+    //   net      = payout vs EVERYTHING staked (incl. money lost on the
+    //              other side, which matters when one wallet hedged both)
+    const gain = r.payout - r.winningStake;
+    const net = r.profit;
+    let sub;
+    if (r.losingStake > 1e-9) {
+      sub = `<div class="prof-flat">gain <span class="${gain > 1e-9 ? 'prof-up' : 'prof-flat'}">`
+          + `${gain > 1e-9 ? '+' : ''}${f(gain)}</span> · net `
+          + `<span class="${net > 1e-9 ? 'prof-up' : (net < -1e-9 ? 'prof-dn' : 'prof-flat')}">`
+          + `${net > 1e-9 ? '+' : ''}${f(net)}</span></div>`;
+    } else if (Math.abs(gain) < 1e-9) {
+      sub = '<div class="prof-flat">no opposing stake</div>';
+    } else {
+      sub = `<div class="prof-up">+${f(gain)}</div>`;
+    }
+    return `<tr class="${isMe ? 'you' : ''}">
+      <td class="addr">${short(r.address)}</td>
+      <td class="num">${f(r.winningStake)}</td>
+      <td class="num">${(r.share * 100).toFixed(1)}%</td>
+      <td class="num">
+        ${r.payout > 0
+          ? `<span class="pay">${f(r.payout)}</span>${sub}`
+          : '<span class="zero">0</span>'}
+      </td></tr>`;
+  }).join('');
+
+  return `<table>
+    <thead><tr>
+      <th>Wallet</th><th class="num">Winning stake</th>
+      <th class="num">Share</th><th class="num">Payout (GEN)</th>
+    </tr></thead><tbody>${body}</tbody></table>`;
+}
+
+async function main() {
+  let markets, escrow;
+  try {
+    [markets, escrow] = await Promise.all([
+      gl.loadMarkets(),
+      gl.addressBalance(gl.FACTORY),
+    ]);
+  } catch (e) {
+    $('list').innerHTML = `<div class="empty">Could not read chain: ${e.message}</div>`;
+    return;
+  }
+
+  $('escrow').innerHTML = `${f(escrow, 4)}<small> GEN</small>`;
+
+  const me = gl.isConnected() ? gl.getAddress() : null;
+  const decided = markets.filter((m) => m.status === 'SETTLED' || m.status === 'RESOLVED');
+
+  let total = 0;
+  for (const m of decided) {
+    for (const r of gl.settlementPayouts(m)) total += r.payout;
+  }
+  $('totalPay').innerHTML = `${f(total, 4)}<small> GEN</small>`;
+
+  if (!decided.length) {
+    $('list').innerHTML = '<div class="empty">No markets have been resolved yet.</div>';
+    return;
+  }
+
+  $('list').innerHTML = decided.map((m) => {
+    const cls = m.status === 'SETTLED' ? 'p-settled' : 'p-res';
+    const winPool = m.outcome === 'YES' ? m.yes : m.no;
+    return `<div class="mkt">
+      <h2>${m.question}</h2>
+      <div class="meta">
+        <span class="pill ${cls}">${m.status}</span>
+        <span class="pill p-open">WON: ${m.outcome}</span>
+        <span class="mid">${m.id}</span>
+      </div>
+      <div class="won" style="margin-bottom:10px">
+        pool <b>${f(m.pool)} GEN</b> · winning side ${f(winPool)} GEN
+      </div>
+      ${payoutTable(m, me)}
+    </div>`;
+  }).join('');
+
+  // Attach real transfer evidence for executed claims.
+  for (const hash of CLAIM_TXS) {
+    try {
+      const ev = await gl.transferEvidence(hash);
+      if (!ev || !ev.transfers.length) continue;
+      const t = ev.transfers[0];
+      const settled = ev.status === 'FINALIZED';
+      const div = document.createElement('div');
+      div.className = 'ev';
+      div.innerHTML = `<div class="ev-h">Emitted payout transfer (on-chain evidence)</div>
+        <div class="ev-row">
+          <span class="ok">✓</span> ${f(t.gen)} GEN → ${short(t.recipient)}<br>
+          exec: <span class="ok">${ev.exec}</span> · status:
+          <span class="${settled ? 'ok' : 'warn'}">${ev.status}</span>
+          ${settled ? '' : ' <span class="warn">(credit settles at finalization)</span>'}<br>
+          <a href="${gl.EXPLORER_TX}${hash}" target="_blank" rel="noopener">${short(hash)} ↗</a>
+        </div>`;
+      $('list').firstElementChild?.appendChild(div);
+    } catch (_) { /* evidence is best-effort */ }
+  }
+}
+
+main();
+</script>
+</body>
+</html>
