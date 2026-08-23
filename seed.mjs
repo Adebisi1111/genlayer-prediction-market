@@ -1,45 +1,69 @@
-// Polyfill window for Node.js
-global.window = {
-  ethereum: {
-    request: async ({ method, params }) => {
-      if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
-        throw new Error('No MetaMask in Node.js');
-      }
-      if (method === 'eth_getBalance') {
-        return '0x0';
-      }
-      return null;
-    },
-    on: () => {},
-    removeListener: () => {},
-  },
-};
+import { createClient, createAccount } from 'genlayer-js';
+import { testnetBradbury } from 'genlayer-js/chains';
+import { readFileSync } from 'fs';
+import { Wallet } from 'ethers';
 
-const { createClient } = await import('genlayer-js');
-const { testnetBradbury } = await import('genlayer-js/chains');
+const FACTORY = process.env.FACTORY;
+const keystore = readFileSync('/home/administrator/.genlayer/keystores/testwallet.json', 'utf8');
+const wallet = Wallet.fromEncryptedJsonSync(keystore, process.env.GLPASS);
+const account = createAccount(wallet.privateKey);
+const client = createClient({ chain: testnetBradbury, account });
 
-const FACTORY = '0x6c2321c516f1793b5365Eb69d8257D6FbC885a7f';
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-const markets = [
-  ['Will Bitcoin exceed $100,000 by end of 2026?','Outcome is YES if BTC/USD price on CoinGecko is above $100,000.','https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'],
-  ['Will Ethereum exceed $5,000 by end of 2026?','Outcome is YES if ETH/USD price on CoinGecko is above $5,000.','https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'],
-  ['Will Manchester City win the 2026 Premier League?','Outcome is YES if Manchester City wins the 2025-2026 Premier League.','https://www.premierleague.com/tables'],
+const MARKETS = [
+  'Will Ethereum exceed $5,000 by end of 2026?',
+  'Will Manchester City win the 2026 Premier League?',
+  'Will the US Federal Reserve cut rates in Q1 2026?',
+  'Will Apple release a foldable iPhone by end of 2026?',
+  'Will Nigeria qualify for the 2026 FIFA World Cup knockout stage?',
 ];
 
-async function main(){
-  const client = createClient({ chain: testnetBradbury });
-  await client.connect('testnetBradbury');
-  for (const [q,r,s1] of markets){
+// marketId -> [option, GEN amount]
+const SEED_STAKES = [
+  ['market-2', 'YES', '0.5'],
+  ['market-3', 'NO', '0.4'],
+  ['market-4', 'YES', '0.3'],
+];
+
+async function write(functionName, args, value = 0n) {
+  for (let attempt = 1; attempt <= 4; attempt++) {
     try {
-      const tx = await client.writeContract({
-        address: FACTORY,
-        functionName: 'createMarket',
-        args: [q, r, 'BINARY', ['YES','NO'], s1, '', ''],
-        value: 1000000000000000000n,
-      });
-      console.log(`Created: ${q} -> ${tx}`);
-    } catch(e) { console.error(`Failed: ${e.message}`); }
+      const hash = await client.writeContract({ address: FACTORY, functionName, args, value });
+      const receipt = await client.waitForTransactionReceipt({ hash, retries: 100, interval: 5000 });
+      let lr = receipt?.consensus_data?.leader_receipt;
+      if (Array.isArray(lr)) lr = lr[0];
+      const exec = receipt?.txExecutionResultName ?? lr?.execution_result;
+      if (exec === 'FINISHED_WITH_RETURN') {
+        console.log(`✅ ${functionName}(${args[0]}) tx=${hash}`);
+        return true;
+      }
+      console.log(`❌ ${functionName}(${args[0]}) -> ${exec}`);
+      return false;
+    } catch (e) {
+      console.log(`   retry ${attempt} (${String(e.message).slice(0, 80)})`);
+      await sleep(20000 * attempt);
+    }
   }
+  return false;
 }
 
-main().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1);});
+for (const q of MARKETS) {
+  await write('createMarket', [q]);
+  await sleep(15000);
+}
+
+const count = await client.readContract({ address: FACTORY, functionName: 'getConfig', args: [] });
+console.log(`\nmarket_count = ${count}`);
+
+for (const [mid, side, gen] of SEED_STAKES) {
+  const wei = BigInt(Math.round(parseFloat(gen) * 1e18));
+  await write('stake', [mid, side], wei);
+  await sleep(15000);
+}
+
+console.log('\nFinal state:');
+for (let i = 1; i <= Number(count); i++) {
+  const m = await client.readContract({ address: FACTORY, functionName: 'getMarket', args: [`market-${i}`] });
+  console.log(`  market-${i}: ${m}`);
+}
