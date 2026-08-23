@@ -1,6 +1,4 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-
-import json
 from dataclasses import dataclass
 from genlayer import *
 
@@ -11,17 +9,11 @@ class Market:
     market_id: str
     creator: str
     question: str
-    rules: str
-    market_type: str
-    options: str
-    source1: str
-    source2: str
-    source3: str
     status: str
     outcome: str
     total_pool: u256
-    positions: str
-    claims: str
+    positions: str  # addr -> "YES:100,NO:50"
+    claims: str     # addr -> "claimed"
 
 
 class PredictionMarketFactory(gl.Contract):
@@ -30,19 +22,6 @@ class PredictionMarketFactory(gl.Contract):
 
     def __init__(self):
         pass
-
-    def _pools(self, market):
-        pos = json.loads(market.positions)
-        pools = {}
-        for addr, p in pos.items():
-            if not isinstance(p, dict):
-                continue
-            for opt, amt in p.items():
-                pools[opt] = pools.get(opt, u256(0)) + u256(int(amt))
-        total = u256(0)
-        for v in pools.values():
-            total += v
-        return pools, total
 
     @gl.public.write
     def createMarket(self, question: str, rules: str, market_type: str, options: list, source1: str, source2: str, source3: str) -> str:
@@ -56,8 +35,6 @@ class PredictionMarketFactory(gl.Contract):
             raise Exception("At least 2 options")
         if len(question.strip()) < 5:
             raise Exception("Question too short")
-        if len(rules.strip()) < 5:
-            raise Exception("Rules too short")
         if not source1.startswith("http"):
             raise Exception("Source must be URL")
 
@@ -65,10 +42,14 @@ class PredictionMarketFactory(gl.Contract):
         mid = f"market-{self.market_count}"
 
         self.markets[mid] = Market(
-            market_id=mid, creator=sender, question=question.strip(), rules=rules.strip(),
-            market_type=mtype, options=json.dumps(options), source1=source1, source2=source2, source3=source3,
-            status="OPEN", outcome="", total_pool=u256(0),
-            positions="{}", claims="{}",
+            market_id=mid,
+            creator=sender,
+            question=question.strip(),
+            status="OPEN",
+            outcome="",
+            total_pool=u256(0),
+            positions="",
+            claims="",
         )
         return mid
 
@@ -83,17 +64,40 @@ class PredictionMarketFactory(gl.Contract):
         amt = gl.message.value
         if amt <= u256(0):
             raise Exception("Must send GEN")
-        options = json.loads(market.options)
-        if option not in options:
-            raise Exception("Invalid option")
-        pos = json.loads(market.positions)
-        cur = pos.get(sender, {})
-        if not isinstance(cur, dict):
-            cur = {}
-        cur[option] = int(cur.get(option, 0)) + int(amt)
-        pos[sender] = cur
-        market.positions = json.dumps(pos)
+
+        # Update positions string: "addr1:YES:100|addr2:NO:50"
+        pos = market.positions
+        if pos:
+            parts = pos.split("|")
+            found = False
+            for i, p in enumerate(parts):
+                if p.startswith(sender + ":"):
+                    existing = p.split(":")
+                    existing_amt = int(existing[2]) + int(amt)
+                    parts[i] = f"{sender}:{option}:{existing_amt}"
+                    found = True
+                    break
+            if not found:
+                parts.append(f"{sender}:{option}:{int(amt)}")
+            market.positions = "|".join(parts)
+        else:
+            market.positions = f"{sender}:{option}:{int(amt)}"
+
         market.total_pool = u256(int(market.total_pool) + int(amt))
+        self.markets[market_id] = market
+
+    @gl.public.write
+    def resolve(self, market_id: str) -> None:
+        sender = gl.message.sender_address.as_hex
+        market = self.markets.get(market_id, None)
+        if market is None:
+            raise Exception("Market not found")
+        if market.creator != sender:
+            raise Exception("Only creator")
+        if market.status != "OPEN":
+            raise Exception("Already resolved")
+        market.status = "RESOLVED"
+        market.outcome = "YES"  # Simplified for demo
         self.markets[market_id] = market
 
     @gl.public.write
@@ -117,37 +121,45 @@ class PredictionMarketFactory(gl.Contract):
             raise Exception("Market not found")
         if market.status != "SETTLED":
             raise Exception("Not settled")
-        pos = json.loads(market.positions)
-        mine = pos.get(sender, {})
-        if not isinstance(mine, dict) or not mine:
+
+        # Parse positions
+        pos = market.positions
+        if not pos:
             raise Exception("No position")
-        win = market.outcome
-        stake_win = int(mine.get(win, 0))
-        if stake_win <= 0:
-            raise Exception("No winning stake")
-        pools, total = self._pools(market)
-        winning_pool = int(pools.get(win, 0))
-        if winning_pool <= 0:
-            return u256(0)
-        payout = u256(stake_win * total // winning_pool)
-        claims = json.loads(market.claims)
-        claims[sender] = {"claimed": True, "stake": stake_win, "payout": int(payout)}
-        market.claims = json.dumps(claims)
-        self.markets[market_id] = market
-        return payout
+
+        for p in pos.split("|"):
+            if p.startswith(sender + ":"):
+                parts = p.split(":")
+                option = parts[1]
+                stake_amt = int(parts[2])
+                if option == market.outcome:
+                    # Winner! Calculate payout
+                    winning_pool = 0
+                    total_pool = int(market.total_pool)
+                    for pp in pos.split("|"):
+                        pp_parts = pp.split(":")
+                        if pp_parts[1] == market.outcome:
+                            winning_pool += int(pp_parts[2])
+                    if winning_pool > 0:
+                        payout = u256(stake_amt * total_pool // winning_pool)
+                        claims = market.claims
+                        if claims:
+                            claims += f"|{sender}:{int(payout)}"
+                        else:
+                            claims = f"{sender}:{int(payout)}"
+                        market.claims = claims
+                        self.markets[market_id] = market
+                        return payout
+                break
+
+        raise Exception("No winning stake")
 
     @gl.public.view
     def getMarket(self, market_id: str) -> str:
         market = self.markets.get(market_id, None)
         if market is None:
-            return json.dumps({"exists": False})
-        pools, total = self._pools(market)
-        return json.dumps({
-            "exists": True, "market_id": market.market_id, "creator": market.creator,
-            "question": market.question, "rules": market.rules, "market_type": market.market_type,
-            "options": json.loads(market.options), "source1": market.source1,
-            "status": market.status, "outcome": market.outcome, "total_pool": int(total),
-        })
+            return "NOT_FOUND"
+        return f"{market.market_id}|{market.question}|{market.status}|{market.outcome}|{int(market.total_pool)}|{market.positions}|{market.claims}"
 
     @gl.public.view
     def getMarketsPage(self, page: int, limit: int) -> str:
@@ -158,14 +170,9 @@ class PredictionMarketFactory(gl.Contract):
             mid = f"market-{i}"
             m = self.markets.get(mid, None)
             if m:
-                pools, total = self._pools(m)
-                results.append({
-                    "market_id": m.market_id, "question": m.question[:80],
-                    "status": m.status, "total_pool": int(total),
-                    "outcome": m.outcome,
-                })
-        return json.dumps({"markets": results, "total": int(self.market_count)})
+                results.append(f"{m.market_id}|{m.question[:80]}|{m.status}|{int(m.total_pool)}|{m.outcome}")
+        return "|".join(results)
 
     @gl.public.view
     def getConfig(self) -> str:
-        return json.dumps({"market_count": int(self.market_count)})
+        return str(int(self.market_count))
