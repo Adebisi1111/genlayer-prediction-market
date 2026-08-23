@@ -101,138 +101,159 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-<script>
-const FACTORY = "0xDD457e0F2FfE7B843f8C90f7997DB06714666CC9";
-const RPC = "https://rpc-bradbury.genlayer.com";
-const EXPLORER = "https://explorer-bradbury.genlayer.com/tx/";
+<button class="btn" id="connectBtn" onclick="doConnect()"
+        style="width:100%;padding:14px;border:0;border-radius:10px;background:#58a6ff;color:#fff;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:20px;font-family:inherit">
+  Connect Wallet
+</button>
 
-const ABI = [
-  "function claim(string marketId) returns (uint256)",
-  "function getMarket(string marketId) view returns (bool exists, string marketId, string creator, string question, string rules, string marketType, string[] options, string source1, string status, string outcome, uint256 totalPool)",
-  "function getConfig() view returns (uint256 marketCount)",
-];
+<!-- Real on-chain data via genlayer-js. Never call GenLayer contracts with
+     ethers/viem aimed at the contract address — calls must route through
+     ConsensusMain. See genlayer-client.js. -->
+<script type="module">
+import * as gl from './genlayer-client.js';
 
-let provider = null, signer = null, contract = null, isConnected = false, address = null;
+const $ = (id) => document.getElementById(id);
 let positions = [];
 
-async function checkConnection(){
-  if(!window.ethereum) return;
+window.doConnect = async () => {
+  const btn = $('connectBtn');
   try {
-    const accounts = await window.ethereum.request({method:"eth_accounts"});
-    if(accounts && accounts.length > 0){
-      isConnected = true;
-      address = accounts[0];
-      provider = new ethers.BrowserProvider(window.ethereum);
-      signer = await provider.getSigner();
-      contract = new ethers.Contract(FACTORY, ABI, signer);
-      const bal = await provider.getBalance(address);
-      document.getElementById('balance').textContent = parseFloat(ethers.formatEther(bal)).toFixed(4)+' GEN';
-      await loadPositions();
-    } else {
-      document.getElementById('marketsList').innerHTML = '<div class="empty"><div class="empty-icon">🔗</div><div>Connect wallet to view positions</div></div>';
-    }
-  } catch(e) {
-    console.error("Connection error:", e);
-    document.getElementById('marketsList').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div>Error connecting: '+e.message+'</div></div>';
+    btn.textContent = 'Connecting…';
+    const addr = await gl.connect();
+    $('balance').textContent = (await gl.getBalance()).toFixed(4) + ' GEN';
+    btn.textContent = addr.slice(0, 6) + '…' + addr.slice(-4);
+    btn.disabled = true;
+    await loadPositions();
+  } catch (e) {
+    btn.textContent = 'Connect Wallet';
+    $('marketsList').innerHTML =
+      `<div class="empty"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;
   }
-}
+};
 
-async function loadPositions(){
-  if(!contract) return;
+async function loadPositions() {
+  const me = (gl.getAddress() || '').toLowerCase();
+  $('marketsList').innerHTML = '<div class="loading">Reading your positions from chain…</div>';
+
   try {
-    // Get total markets
-    const config = await contract.getConfig();
-    const totalMarkets = Number(config.marketCount);
-    
+    const markets = await gl.loadMarkets();
     positions = [];
-    let totalWon = 0, totalLost = 0, totalClaimable = 0;
 
-    // Check each market for user positions
-    for(let i = 1; i <= totalMarkets; i++){
-      const marketId = `market-${i}`;
-      try {
-        const market = await contract.getMarket(marketId);
-        if(!market.exists) continue;
-        
-        // Check if user has positions (read from contract storage would be ideal, but we try-catch claim)
-        // For now, show all settled/resolved markets
-        if(market.status === 'SETTLED' || market.status === 'RESOLVED'){
-          positions.push({
-            marketId,
-            question: market.question,
-            status: market.status,
-            outcome: market.outcome,
-            totalPool: Number(ethers.formatEther(market.totalPool)),
-          });
-        }
-      } catch(e) {
-        // Skip markets that error
+    for (const m of markets) {
+      // Sum this wallet's stake per side from the on-chain position list.
+      let yes = 0, no = 0;
+      for (const h of m.holders) {
+        if ((h.address || '').toLowerCase() !== me) continue;
+        if (h.side === 'YES') yes += h.amount; else if (h.side === 'NO') no += h.amount;
       }
-    }
+      if (yes === 0 && no === 0) continue;
 
-    renderPositions();
-  } catch(e) {
-    console.error("Load error:", e);
-    document.getElementById('marketsList').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div>Error loading positions: '+e.message+'</div></div>';
+      const staked = yes + no;
+      let payout = 0, state = 'open';
+
+      if (m.status === 'SETTLED' || m.status === 'RESOLVED') {
+        const won = m.outcome === 'YES' ? yes : m.outcome === 'NO' ? no : 0;
+        const winningPool = m.outcome === 'YES' ? m.yes : m.no;
+        payout = winningPool > 0 ? (won * m.pool) / winningPool : 0;
+        state = won > 0 ? (m.status === 'SETTLED' ? 'claimable' : 'won') : 'lost';
+      }
+      positions.push({ ...m, yesStake: yes, noStake: no, staked, payout, state });
+    }
+    render();
+  } catch (e) {
+    $('marketsList').innerHTML =
+      `<div class="empty"><div class="empty-icon">⚠️</div><div>Could not read positions: ${e.message}</div></div>`;
   }
 }
 
-function renderPositions(){
-  const el = document.getElementById('marketsList');
-  if(positions.length === 0){
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div>No positions found</div><div style="font-size:12px;margin-top:8px">Stake on markets to see them here</div></div>';
+function render() {
+  const el = $('marketsList');
+
+  if (!positions.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div>No positions yet</div>' +
+      '<div style="font-size:12px;margin-top:8px">Stake on a market and it will appear here</div></div>';
+    $('totalWon').textContent = '+0.00 GEN';
+    $('totalLost').textContent = '-0.00 GEN';
+    $('totalClaimable').textContent = '0.00 GEN';
     return;
   }
 
-  el.innerHTML = positions.map(m => `
-    <div class="market ${m.status === 'SETTLED' ? 'winnable' : ''}">
-      <div class="market-header">
-        <span class="market-status status-${m.status.toLowerCase()}">${m.status}</span>
-      </div>
-      <div class="market-question">${m.question}</div>
-      <div class="market-details">
-        <div class="detail-row">
-          <span class="detail-label">Outcome</span>
-          <span class="detail-value" style="color:var(--green)">${m.outcome || 'Pending'}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Pool</span>
-          <span class="detail-value">${m.totalPool.toFixed(2)} GEN</span>
-        </div>
-      </div>
-      ${m.status === 'SETTLED' ? `
-        <button class="btn btn-claim" onclick="claim('${m.marketId}', this)">Claim Winnings</button>
-      ` : `
-        <button class="btn btn-pending" disabled>Claim after settlement</button>
-      `}
-    </div>
-  `).join('');
-
-  // Update summary
-  document.getElementById('totalClaimable').textContent = positions.filter(p => p.status === 'SETTLED').length + ' markets';
-}
-
-async function claim(marketId, btn){
-  if(!isConnected) return alert('Please connect your wallet first');
-  try {
-    btn.disabled = true;
-    btn.textContent = 'Claiming...';
-    const tx = await contract.claim(marketId);
-    const receipt = await tx.wait();
-    document.getElementById('txResult').classList.add('show');
-    document.getElementById('txLink').href = EXPLORER + tx.hash;
-    btn.textContent = 'Claimed ✓';
-    btn.className = 'btn btn-claimed';
-  } catch(e) {
-    alert('Error: ' + e.message);
-    btn.disabled = false;
-    btn.textContent = 'Claim Winnings';
+  let won = 0, lost = 0, claimable = 0;
+  for (const p of positions) {
+    if (p.state === 'claimable') { claimable += p.payout; won += Math.max(p.payout - p.staked, 0); }
+    else if (p.state === 'won') won += Math.max(p.payout - p.staked, 0);
+    else if (p.state === 'lost') lost += p.staked;
   }
+  $('totalWon').textContent = '+' + won.toFixed(2) + ' GEN';
+  $('totalLost').textContent = '-' + lost.toFixed(2) + ' GEN';
+  $('totalClaimable').textContent = claimable.toFixed(2) + ' GEN';
+
+  el.innerHTML = positions.map(p => {
+    const sides = [
+      p.yesStake > 0 ? `YES ${p.yesStake.toFixed(2)}` : null,
+      p.noStake > 0 ? `NO ${p.noStake.toFixed(2)}` : null,
+    ].filter(Boolean).join(' · ');
+
+    let action = '';
+    if (p.state === 'claimable') {
+      action = `<button onclick="doClaim('${p.id}')" id="btn-${p.id}"
+        style="width:100%;padding:12px;border:0;border-radius:8px;background:#3fb950;color:#fff;
+        font-weight:700;cursor:pointer;font-family:inherit;margin-top:12px">
+        Claim ${p.payout.toFixed(2)} GEN</button>`;
+    } else if (p.state === 'lost') {
+      action = `<div style="margin-top:12px;font-size:13px;color:#f85149">Outcome ${p.outcome} — position lost</div>`;
+    } else if (p.state === 'won') {
+      action = `<div style="margin-top:12px;font-size:13px;color:#7a8a9a">Resolved ${p.outcome} — awaiting settlement</div>`;
+    } else {
+      action = `<div style="margin-top:12px;font-size:13px;color:#7a8a9a">Market still open</div>`;
+    }
+
+    return `
+      <div style="background:#111820;border:1px solid #2a3540;border-radius:12px;padding:20px;margin-bottom:16px">
+        <div style="font-weight:700;font-size:16px;margin-bottom:10px">${p.question}</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:#7a8a9a;margin-bottom:6px">
+          <span>Your position</span><span style="color:#e6edf3;font-family:ui-monospace,monospace">${sides}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:#7a8a9a;margin-bottom:6px">
+          <span>Total staked</span><span style="color:#e6edf3;font-family:ui-monospace,monospace">${p.staked.toFixed(2)} GEN</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:#7a8a9a">
+          <span>Market pool · status</span>
+          <span style="color:#e8c98a;font-family:ui-monospace,monospace">${p.pool.toFixed(2)} GEN · ${p.status}</span>
+        </div>
+        ${action}
+      </div>`;
+  }).join('');
 }
 
-// Initialize
-checkConnection();
+window.doClaim = async (marketId) => {
+  const btn = $('btn-' + marketId);
+  const original = btn ? btn.textContent : '';
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Confirm in wallet… (~30-60s)'; }
+    const { hash } = await gl.claim(marketId);
+
+    const res = $('txResult');
+    res.style.display = 'block';
+    res.innerHTML =
+      `<div>✅ Claim recorded on chain for ${marketId}</div>` +
+      `<div style="margin-top:8px;font-family:ui-monospace,monospace;font-size:11px;word-break:break-all">${hash}</div>` +
+      `<div style="margin-top:8px"><a href="${gl.EXPLORER_TX}${hash}" target="_blank" rel="noopener">View on Explorer</a></div>`;
+
+    $('balance').textContent = (await gl.getBalance()).toFixed(4) + ' GEN';
+    await loadPositions();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = original; }
+    const res = $('txResult');
+    res.style.display = 'block';
+    res.style.background = '#2d0a0a';
+    res.style.borderColor = '#f85149';
+    res.innerHTML = `<div style="color:#f85149">❌ ${e.message}</div>`;
+  }
+};
+
+$('marketsList').innerHTML =
+  '<div class="empty"><div class="empty-icon">🔗</div><div>Connect your wallet to view positions</div></div>';
 </script>
 </body>
 </html>

@@ -11,5 +11,8 @@
     "genlayer-js": "^1.1.8",
     "node-fetch": "^3.3.2",
     "viem": "^2.55.19"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
   }
 }

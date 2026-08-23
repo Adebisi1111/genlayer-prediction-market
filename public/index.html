@@ -74,9 +74,18 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .market-options{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
 .market-option{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel2);border-radius:8px;font-size:13px}
 .option-name{font-weight:500}
+.market-odds{margin:14px 0}
+.odds-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.odds-label{font-size:12px;color:var(--muted);width:28px;flex-shrink:0}
+.odds-bar{flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.odds-fill{height:100%;border-radius:4px;transition:width .3s}
+.odds-yes{background:var(--green)}
+.odds-no{background:var(--red)}
+.odds-value{font-size:13px;font-weight:700;font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;width:42px;text-align:right;flex-shrink:0}
 .option-price{font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600;color:var(--butter)}
 .market-footer{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--border)}
 .market-pool{font-size:12px;color:var(--muted)}
+.market-id{font-size:11px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace}
 .market-pool span{font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-weight:600;color:var(--text)}
 .market-end{font-size:11px;color:var(--muted)}
 
@@ -202,199 +211,155 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 </div>
 
-<!-- Use ethers.js instead of genlayer-js to avoid viem encoding issues -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-<script>
-const FACTORY = "0xDD457e0F2FfE7B843f8C90f7997DB06714666CC9";
-const RPC = "https://rpc-bradbury.genlayer.com";
+<!-- Real on-chain data via genlayer-js. Do NOT swap this for ethers/viem
+     pointed at the contract address: GenLayer calls must route through
+     ConsensusMain, which genlayer-js handles. See genlayer-client.js. -->
+<script type="module">
+import * as gl from './genlayer-client.js';
 
-// Contract ABI (only the functions we need)
-const ABI = [
-  "function createMarket(string question, string rules, string marketType, string[] options, string source1, string source2, string source3) returns (string)",
-  "function getMarketsPage(uint256 page, uint256 limit) returns (string[] marketIds, string[] questions, string[] statuses, uint256[] totalPools, string[] outcomes, uint256 total)",
-  "function getConfig() view returns (uint256 marketCount)",
-  "function stake(string marketId, string option) payable"
-];
+let markets = [];
+let filter = 'all';
 
-let provider = null, signer = null, contract = null, isConnected = false, currentCategory = "all";
+const $ = (id) => document.getElementById(id);
 
-async function connect(){
-  const b = document.getElementById("addr"), btn = document.getElementById("connectBtn");
-  if(isConnected){
-    provider = null; signer = null; contract = null; isConnected = false;
-    b.textContent = "Not connected";
-    document.getElementById("balance").textContent = "—";
-    btn.textContent = "Connect Wallet";
-    loadSampleMarkets();
-    return;
-  }
-  try {
-    btn.textContent = "Connecting...";
-    if(!window.ethereum){ alert("Open in MetaMask browser"); btn.textContent = "Connect Wallet"; return; }
-    
-    // Request accounts
-    const accounts = await window.ethereum.request({method: "eth_requestAccounts"});
-    if(!accounts || accounts.length === 0){ alert("No accounts found"); btn.textContent = "Connect Wallet"; return; }
-    
-    // Create provider and signer
-    provider = new ethers.BrowserProvider(window.ethereum);
-    signer = await provider.getSigner();
-    contract = new ethers.Contract(FACTORY, ABI, signer);
-    
-    const address = await signer.getAddress();
-    b.textContent = "Connected: " + address;
-    btn.textContent = "Connected (tap to disconnect)";
-    isConnected = true;
-    
-    // Get balance
-    const bal = await provider.getBalance(address);
-    document.getElementById("balance").textContent = parseFloat(ethers.formatEther(bal)).toFixed(4) + " GEN";
-    
-    loadMarkets();
-  } catch(e){ 
-    console.error("Connect error:", e);
-    b.textContent = "Failed: " + e.message; 
-    btn.textContent = "Connect Wallet"; 
-  }
+// Heuristic categorisation — the v15 contract stores only the question text.
+function categorise(q) {
+  const s = q.toLowerCase();
+  if (/bitcoin|ethereum|btc|eth|crypto|token|genlayer|mainnet|solana/.test(s)) return 'crypto';
+  if (/win|league|cup|world cup|premier|match|qualify|knockout|fifa/.test(s)) return 'sports';
+  if (/election|president|senate|federal reserve|fed |rates|policy|government/.test(s)) return 'politics';
+  if (/apple|iphone|launch|release|foldable|tesla|openai/.test(s)) return 'news';
+  return 'science';
 }
 
-async function loadMarkets(){
-  const el = document.getElementById("marketsList");
-  if(!contract){
-    loadSampleMarkets();
+const CAT_ICON = { crypto: '₿', sports: '⚽', politics: '🏛️', news: '📰', science: '🔬', entertainment: '🎬' };
+
+function render() {
+  const list = $('marketsList');
+  const shown = filter === 'all' ? markets : markets.filter(m => m.category === filter);
+
+  $('marketCount').textContent = `${shown.length} market${shown.length === 1 ? '' : 's'}`;
+
+  if (!shown.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>No markets in this category</div></div>';
     return;
   }
-  try {
-    const result = await contract.getMarketsPage(1, 20);
-    const markets = result.markets || [];
-    const total = result.total ? Number(result.total) : 0;
-    
-    if(markets.length === 0){
-      el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>No markets yet. Create the first one!</div></div>';
-    } else {
-      el.innerHTML = markets.map(m => renderMarket(m)).join('');
-    }
-    document.getElementById("totalMarkets").textContent = total;
-    document.getElementById("marketCount").textContent = markets.length + " markets";
-  } catch(e){
-    console.error("Load error:", e);
-    loadSampleMarkets();
-  }
-}
 
-function renderMarket(m){
-  const catClass = {
-    'crypto':'cat-crypto','sports':'cat-sports','politics':'cat-politics',
-    'news':'cat-news','entertainment':'cat-entertainment','science':'cat-science'
-  }[m.category || 'crypto'] || 'cat-crypto';
-  const statusClass = {
-    'OPEN':'status-open','RESOLVED':'status-resolved','SETTLED':'status-settled','DISPUTED':'status-disputed'
-  }[m.status] || 'status-open';
-  const pool = (m.totalPool ? Number(ethers.formatEther(m.totalPool)) : 0).toFixed(2);
-  const options = m.options || ["YES","NO"];
-  return `
-    <div class="market" onclick="openMarket('${m.marketId}')">
-      <div class="market-header">
-        <span class="market-category ${catClass}">${(m.category||'crypto').toUpperCase()}</span>
-        <span class="market-status ${statusClass}">${m.status}</span>
-      </div>
-      <div class="market-question">${m.question}</div>
-      <div class="market-options">
-        ${options.map((o,i) => `
-          <div class="market-option">
-            <span class="option-name">${o}</span>
-            <span class="option-price">${i===0?'62':i===1?'38':'50'}¢</span>
+  list.innerHTML = shown.map(m => {
+    const yesPct = Math.round(m.yesPrice * 100);
+    const noPct = 100 - yesPct;
+    const statusClass = m.status === 'OPEN' ? 'status-open'
+                      : m.status === 'RESOLVED' ? 'status-resolved' : 'status-settled';
+    const outcome = m.outcome ? ` → ${m.outcome}` : '';
+    return `
+      <div class="market" onclick="location.href='./stake.html?id=${m.id}'">
+        <div class="market-header">
+          <span class="badge cat-${m.category}">${CAT_ICON[m.category] || ''} ${m.category}</span>
+          <span class="badge ${statusClass}">${m.status}${outcome}</span>
+        </div>
+        <div class="market-question">${m.question}</div>
+        <div class="market-odds">
+          <div class="odds-row">
+            <span class="odds-label">Yes</span>
+            <div class="odds-bar"><div class="odds-fill odds-yes" style="width:${yesPct}%"></div></div>
+            <span class="odds-value">${yesPct}¢</span>
           </div>
-        `).join("")}
-      </div>
-      <div class="market-footer">
-        <span class="market-pool">Pool: <span>${pool} GEN</span></span>
-        <span class="market-end">${m.outcome ? '→ '+m.outcome : 'Ends '+ (m.end_date || 'TBD')}</span>
-      </div>
-    </div>
-  `;
+          <div class="odds-row">
+            <span class="odds-label">No</span>
+            <div class="odds-bar"><div class="odds-fill odds-no" style="width:${noPct}%"></div></div>
+            <span class="odds-value">${noPct}¢</span>
+          </div>
+        </div>
+        <div class="market-footer">
+          <span class="market-pool">${m.pool.toFixed(2)} GEN pool</span>
+          <span class="market-id">${m.id}</span>
+        </div>
+      </div>`;
+  }).join('');
 }
 
-function openMarket(id){
-  const m = sampleMarkets.find(x => x.marketId === id);
-  if(!m) return alert("Market not found");
-  window.location.href = `stake.html?id=${m.marketId}&q=${encodeURIComponent(m.question)}&cat=${m.category}&pool=${m.totalPool}&yes=62&no=38&status=${m.status}`;
+function updateStats() {
+  const volume = markets.reduce((a, m) => a + m.pool, 0);
+  $('totalMarkets').textContent = markets.length;
+  $('totalVolume').textContent = volume.toFixed(2);
+  $('activeMarkets').textContent = markets.filter(m => m.status === 'OPEN').length;
+
+  const counts = {};
+  for (const m of markets) counts[m.category] = (counts[m.category] || 0) + 1;
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v || 0; };
+  set('countAll', markets.length);
+  set('countCrypto', counts.crypto);
+  set('countSports', counts.sports);
+  set('countPolitics', counts.politics);
+  set('countNews', counts.news);
+  set('countEnt', counts.entertainment);
+  set('countScience', counts.science);
 }
 
-function filterCategory(cat, btn){
-  currentCategory = cat;
-  document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  const titles = {all:"All Markets",crypto:"Crypto",sports:"Sports",politics:"Politics",news:"News",entertainment:"Entertainment",science:"Science"};
-  document.getElementById("sectionTitle").textContent = titles[cat] || "Markets";
-  if(contract) loadMarkets(); else loadSampleMarkets();
-}
-
-function showCreate(){ document.getElementById("createModal").style.display = "flex"; }
-function hideCreate(){ document.getElementById("createModal").style.display = "none"; }
-
-async function submitCreate(){
-  if(!isConnected) return alert("Connect wallet first");
-  const q = document.getElementById("qQuestion").value;
-  const r = document.getElementById("qRules").value;
-  const s1 = document.getElementById("qSource1").value;
-  const opt1 = document.getElementById("qOpt1").value;
-  const opt2 = document.getElementById("qOpt2").value;
-  if(!q || q.length < 10) return alert("Question must be at least 10 characters");
-  if(!r || r.length < 10) return alert("Rules must be at least 10 characters");
-  if(!s1 || !s1.startsWith("http")) return alert("Valid source URL required");
+async function loadMarkets() {
   try {
-    const tx = await contract.createMarket(q, r, "BINARY", [opt1, opt2], s1, "", "");
-    alert("Market created! Tx: " + tx.hash);
-    hideCreate();
-    loadMarkets();
-  } catch(e) { alert("Error: " + e.message); }
-}
-
-// Sample markets for when not connected
-const sampleMarkets = [
-  {id:"m1",marketId:"market-1",question:"Will Bitcoin exceed $100,000 by end of 2026?",category:"crypto",status:"OPEN",totalPool:1250,end_date:"2026-12-31",options:["Yes","No"]},
-  {id:"m2",marketId:"market-2",question:"Will Ethereum exceed $5,000 by end of 2026?",category:"crypto",status:"OPEN",totalPool:890,end_date:"2026-12-31",options:["Yes","No"]},
-  {id:"m3",marketId:"market-3",question:"Will Manchester City win the 2026 Premier League?",category:"sports",status:"OPEN",totalPool:2100,end_date:"2026-05-31",options:["Yes","No"]},
-  {id:"m4",marketId:"market-4",question:"Will Argentina win the 2026 FIFA World Cup?",category:"sports",status:"RESOLVED",totalPool:3400,end_date:"2026-07-19",outcome:"Yes",options:["Yes","No"]},
-  {id:"m5",marketId:"market-5",question:"Will the US Federal Reserve cut rates in Q1 2026?",category:"politics",status:"OPEN",totalPool:560,end_date:"2026-03-31",options:["Yes","No"]},
-  {id:"m6",marketId:"market-6",question:"Will Apple release a foldable iPhone by end of 2026?",category:"news",status:"OPEN",totalPool:1800,end_date:"2026-12-31",options:["Yes","No"]},
-  {id:"m7",marketId:"market-7",question:"Will Oppenheimer win Best Picture at the 2026 Oscars?",category:"entertainment",status:"OPEN",totalPool:670,end_date:"2026-03-15",options:["Yes","No"]},
-  {id:"m8",marketId:"market-8",question:"Will there be a major earthquake (>7.0) in California by 2026?",category:"science",status:"OPEN",totalPool:980,end_date:"2026-12-31",options:["Yes","No"]},
-  {id:"m9",marketId:"market-9",question:"Will Solana flip ETH in market cap by 2026?",category:"crypto",status:"OPEN",totalPool:1560,end_date:"2026-12-31",options:["Yes","No"]},
-];
-
-function loadSampleMarkets(){
-  let markets = currentCategory === "all" ? sampleMarkets : sampleMarkets.filter(m => m.category === currentCategory);
-  const el = document.getElementById("marketsList");
-  if(markets.length === 0){
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>No markets in this category</div></div>';
-    return;
+    const loaded = await gl.loadMarkets();
+    markets = loaded.map(m => ({ ...m, category: categorise(m.question) }));
+    updateStats();
+    render();
+  } catch (e) {
+    $('marketsList').innerHTML =
+      `<div class="empty"><div class="empty-icon">⚠️</div><div>Could not read the contract.<br>${e.message}</div></div>`;
   }
-  el.innerHTML = markets.map(m => renderMarket(m)).join('');
-  document.getElementById("totalMarkets").textContent = sampleMarkets.length;
-  document.getElementById("totalVolume").textContent = sampleMarkets.reduce((a,m)=>a+(m.totalPool||0),0).toLocaleString();
-  document.getElementById("activeMarkets").textContent = sampleMarkets.filter(m=>m.status==="OPEN").length;
-  document.getElementById("marketCount").textContent = markets.length + " markets";
-  document.getElementById("countAll").textContent = sampleMarkets.length;
-  document.getElementById("countCrypto").textContent = sampleMarkets.filter(m=>m.category==="crypto").length;
-  document.getElementById("countSports").textContent = sampleMarkets.filter(m=>m.category==="sports").length;
-  document.getElementById("countPolitics").textContent = sampleMarkets.filter(m=>m.category==="politics").length;
-  document.getElementById("countNews").textContent = sampleMarkets.filter(m=>m.category==="news").length;
-  document.getElementById("countEnt").textContent = sampleMarkets.filter(m=>m.category==="entertainment").length;
-  document.getElementById("countScience").textContent = sampleMarkets.filter(m=>m.category==="science").length;
 }
 
-window.connect = connect;
-window.loadMarkets = loadMarkets;
-window.openMarket = openMarket;
-window.filterCategory = filterCategory;
-window.showCreate = showCreate;
-window.hideCreate = hideCreate;
-window.submitCreate = submitCreate;
+window.filterCategory = (cat, btn) => {
+  filter = cat;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  $('sectionTitle').textContent = cat === 'all' ? 'All Markets' : cat[0].toUpperCase() + cat.slice(1) + ' Markets';
+  render();
+};
 
-// Initial load
-loadSampleMarkets();
+window.connect = async () => {
+  const btn = $('connectBtn');
+  try {
+    btn.textContent = 'Connecting…';
+    const addr = await gl.connect();
+    $('addr').textContent = addr.slice(0, 6) + '…' + addr.slice(-4);
+    $('balance').textContent = (await gl.getBalance()).toFixed(4) + ' GEN';
+    btn.textContent = 'Connected';
+    btn.disabled = true;
+  } catch (e) {
+    btn.textContent = 'Connect Wallet';
+    alert('Connect failed: ' + e.message);
+  }
+};
+
+window.showCreate = () => {
+  if (!gl.isConnected()) { alert('Connect your wallet first.'); return; }
+  $('createModal').style.display = 'flex';
+};
+window.hideCreate = () => { $('createModal').style.display = 'none'; };
+
+window.submitCreate = async () => {
+  const q = $('qQuestion').value.trim();
+  if (!q) { alert('Enter a question.'); return; }
+
+  const btn = document.querySelector('#createModal .btn-primary');
+  const original = btn.textContent;
+  try {
+    btn.disabled = true;
+    btn.textContent = 'Confirm in wallet… (~30-60s)';
+    const { hash } = await gl.createMarket(q);
+    $('createModal').style.display = 'none';
+    alert('Market created on chain.\n\n' + hash);
+    $('qQuestion').value = '';
+    await loadMarkets();
+  } catch (e) {
+    alert('Create failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+};
+
+loadMarkets();
 </script>
 </body>
 </html>
