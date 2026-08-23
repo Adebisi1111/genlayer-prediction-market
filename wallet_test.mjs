@@ -51,11 +51,23 @@ await page.waitForFunction(
 console.log('market loaded :', (await page.locator('#q').textContent()).slice(0, 50));
 
 await page.click('#connectBtn');
-// Wait until the button stops saying "Connecting…"
+// The connect button HIDES on success, so watch the balance field (the real
+// signal that connect() resolved) rather than the button's text.
 await page.waitForFunction(
-  () => !/Connecting/.test(document.getElementById('connectBtn').textContent),
+  () => {
+    const b = document.getElementById('balance');
+    const btn = document.getElementById('connectBtn');
+    const connected = b && /GEN/.test(b.textContent);
+    const failed = btn && /failed|error/i.test(btn.textContent);
+    return connected || failed;
+  },
   { timeout: 60000 }
 );
+
+const btnHidden = await page.locator('#connectBtn').evaluate(
+  (el) => el.style.display === 'none' || !el.offsetParent
+).catch(() => false);
+console.log('connect btn hidden after connect:', btnHidden);
 
 const btnText = (await page.locator('#connectBtn').textContent()).trim();
 const balText = (await page.locator('#balance').textContent()).trim();
@@ -67,7 +79,9 @@ console.log('balance shown :', balText);
 console.log('stake button  :', stakeBtn);
 if (txResult) console.log('error banner  :', txResult.slice(0, 140));
 
-const connected = /^0x[0-9a-fA-F]{4}…/.test(btnText) && /GEN/.test(balText);
+// Success signal = balance populated (the connect button is hidden on success,
+// so its text is NOT a valid indicator — it stays on "Connecting…").
+const connected = /GEN/.test(balText) && btnHidden;
 console.log(connected ? '✅ CONNECT SUCCEEDED' : '❌ CONNECT FAILED');
 
 // With a wallet attached the stake button should become actionable.
