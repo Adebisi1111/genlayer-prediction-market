@@ -108,10 +108,15 @@
   positions using the same parimutuel formula the contract runs:
   <code>your_stake ÷ winning_pool × total_pool</code>.
   Calling <code>claim</code> executes that math on-chain and the contract emits a
-  GEN transfer message to the winner. On Bradbury these emitted transfers settle at
-  network <b>finalization</b>, which lags acceptance — so a claim can be executed and
-  recorded while the balance credit is still pending. Every figure here is derived
-  from chain state, never from a database.
+  GEN transfer message to the winner via
+  <code>emit_transfer(value=…, on=…)</code>. These emitted transfers settle at
+  network <b>finalization</b>. On the Bradbury testnet, transactions have been
+  observed holding at <b>ACCEPTED</b> without progressing to FINALIZED, so a
+  payout can be correctly computed, executed and recorded on-chain while the
+  balance credit remains pending at the network layer — verified across
+  multiple contracts with both <code>on='accepted'</code> and
+  <code>on='finalized'</code>. Escrow deposits settle normally. Every figure on
+  this page is derived from live chain state, never from a database.
 </div>
 
 <script type="module">
