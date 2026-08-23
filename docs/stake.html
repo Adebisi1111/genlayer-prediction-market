@@ -195,7 +195,7 @@
 </div>
 
 <script type="module">
-import * as gl from './gl-client.v2.js?v=4';
+import * as gl from './gl-client.v2.js?v=5';
 
 const params = new URLSearchParams(location.search);
 const marketId = params.get('id') || 'market-1';
@@ -266,22 +266,37 @@ function calcPayout() {
     const el = $(s === 'YES' ? 'oddsYes' : 'oddsNo');
     if (!el) continue;
     const m = gl.sideMultiplier(market, s);
-    el.textContent = m.oneSided ? '—' : m.multiplier.toFixed(2) + '×';
+    el.textContent = m.empty ? 'all ' + m.opposing.toFixed(2) + ' GEN'
+                   : m.oneSided ? '—'
+                   : m.multiplier.toFixed(2) + '×';
   }
 
   if (amt <= 0) {
     // Empty state: show the multiplier for the SELECTED side rather than
     // zeros, so the panel still distinguishes YES from NO.
     const m = gl.sideMultiplier(market, side);
-    $('winAmt').textContent = m.oneSided ? '1.00× (no opposing stake)' : m.multiplier.toFixed(2) + '× your stake';
-    $('winPct').textContent = m.oneSided ? 'no opposing stake yet' : '+' + m.impliedPct.toFixed(0) + '% if right';
+    if (m.empty) {
+      // First staker on this side takes the entire opposing pool.
+      $('winAmt').textContent = 'first staker takes ' + m.opposing.toFixed(2) + ' GEN';
+      $('winPct').textContent = 'no stake on this side yet';
+      $('dRoi').textContent = 'unbounded';
+      $('barPayout').textContent = 'takes pot';
+    } else if (m.oneSided) {
+      $('winAmt').textContent = '1.00× (no opposing stake)';
+      $('winPct').textContent = 'no opposing stake yet';
+      $('dRoi').textContent = '0% (one-sided)';
+      $('barPayout').textContent = '—';
+    } else {
+      $('winAmt').textContent = m.multiplier.toFixed(2) + '× your stake';
+      $('winPct').textContent = '+' + m.impliedPct.toFixed(0) + '% if right';
+      $('dRoi').textContent = m.impliedPct.toFixed(0) + '%';
+      $('barPayout').textContent = m.multiplier.toFixed(2) + '×';
+    }
     $('loseAmt').textContent = 'your stake';
     $('dStake').textContent = '0.00 GEN';
     $('dPool').textContent = fmt(market.pool) + ' GEN';
     $('dProfit').textContent = '—';
-    $('dRoi').textContent = m.oneSided ? '0% (one-sided)' : m.impliedPct.toFixed(0) + '%';
     $('barSide').textContent = `${side} · enter amount`;
-    $('barPayout').textContent = m.oneSided ? '—' : m.multiplier.toFixed(2) + '×';
     const b0 = $('stakeBtn');
     if (market.status === 'OPEN' && gl.isConnected()) {
       b0.disabled = true;

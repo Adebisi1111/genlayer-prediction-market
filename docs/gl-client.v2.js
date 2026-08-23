@@ -203,14 +203,22 @@ export function previewPayout(market, side, stakeGen) {
 export function sideMultiplier(market, side) {
   const sidePool = side === 'YES' ? market.yes : market.no;
   const opposing = side === 'YES' ? market.no : market.yes;
-  if (opposing <= 0) return { multiplier: 1, impliedPct: null, oneSided: true };
+  if (opposing <= 0) return { multiplier: 1, impliedPct: null, oneSided: true, empty: false };
+
+  // Nobody on this side yet: a first staker would take the whole pot, so the
+  // ratio is unbounded. Don't return Infinity — the UI must show something
+  // meaningful, so flag it and let the caller phrase it.
+  if (sidePool <= 0) {
+    return { multiplier: null, impliedPct: null, oneSided: false, empty: true, opposing };
+  }
 
   // Limit case for a small stake: total / winning side.
-  const multiplier = sidePool > 0 ? market.pool / sidePool : Infinity;
+  const multiplier = market.pool / sidePool;
   return {
     multiplier,
     impliedPct: (multiplier - 1) * 100,
     oneSided: false,
+    empty: false,
   };
 }
 
