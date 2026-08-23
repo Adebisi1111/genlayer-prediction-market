@@ -30,7 +30,7 @@
 //     defensively: take the first 4 fields, treat the remainder as positions.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createClient, createAccount } from 'https://esm.sh/genlayer-js@1.1.8';
+import { createClient } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
 export const FACTORY = '0xF8bf266694Cc729d9e1032e9dA244febfE10b335';
@@ -81,7 +81,15 @@ export async function connect() {
   if (!accounts || !accounts.length) throw new Error('No account authorised.');
   await ensureChain();
   address = accounts[0];
-  client = createClient({ chain: testnetBradbury, account: createAccount(address) });
+  // IMPORTANT: pass the ADDRESS plus the injected provider.
+  // Do NOT use createAccount(address) — createAccount takes a PRIVATE KEY and
+  // throws "invalid private key, expected hex or 32 bytes, got string" on an
+  // address. Browser wallets sign via `provider`, so no key is ever exposed.
+  client = createClient({
+    chain: testnetBradbury,
+    account: address,
+    provider: window.ethereum,
+  });
   return address;
 }
 
