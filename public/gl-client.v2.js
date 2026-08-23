@@ -156,15 +156,37 @@ export function parseMarket(id, raw) {
   };
 }
 
-/** Parimutuel payout preview, computed client-side from on-chain pools. */
+/** Parimutuel payout preview, computed client-side from on-chain pools.
+ *
+ * Note on one-sided markets: if nobody has staked the opposing side, the
+ * winning pool equals the whole pool, so payout == your stake and ROI is 0%.
+ * That is mathematically correct, not a bug — you can only win other people's
+ * money. Callers should surface that explicitly instead of showing "0%".
+ */
 export function previewPayout(market, side, stakeGen) {
   const amt = parseFloat(stakeGen) || 0;
-  if (amt <= 0) return { payout: 0, profit: 0, roi: 0 };
+  if (amt <= 0) return { payout: 0, profit: 0, roi: 0, opposing: 0, oneSided: false };
+
   const sidePool = side === 'YES' ? market.yes : market.no;
-  const winningPool = sidePool + amt;
-  const totalPool = market.pool + amt;
-  const payout = winningPool > 0 ? (amt * totalPool) / winningPool : amt;
-  return { payout, profit: payout - amt, roi: amt > 0 ? ((payout - amt) / amt) * 100 : 0 };
+  const opposing = side === 'YES' ? market.no : market.yes;
+
+  const winningPool = sidePool + amt;      // your stake joins the winning side
+  const totalPool = market.pool + amt;     // and the total pot
+
+  let payout = winningPool > 0 ? (amt * totalPool) / winningPool : amt;
+
+  // Guard against float dust producing -0.00 / -0%.
+  if (!isFinite(payout) || payout < 0) payout = 0;
+  const profit = Math.abs(payout - amt) < 1e-12 ? 0 : payout - amt;
+  const roi = amt > 0 ? (profit / amt) * 100 : 0;
+
+  return {
+    payout,
+    profit,
+    roi: Object.is(roi, -0) ? 0 : roi,
+    opposing,
+    oneSided: opposing <= 0,
+  };
 }
 
 export async function loadMarkets() {
