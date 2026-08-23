@@ -190,6 +190,30 @@ export function previewPayout(market, side, stakeGen) {
   };
 }
 
+/** Payout multiplier for a side, independent of stake size.
+ *
+ * This is what a market's odds actually mean: stake 1 GEN on `side` and you'd
+ * get back roughly `multiplier` GEN if it wins. Unlike previewPayout it does
+ * NOT need an amount, so the UI can show meaningful per-side numbers BEFORE
+ * the user types anything — otherwise both YES and NO read "+0.00 GEN / 0%",
+ * which looks identical and therefore broken.
+ *
+ * Uses a nominal 1-unit stake so the ratio reflects current pool balance.
+ */
+export function sideMultiplier(market, side) {
+  const sidePool = side === 'YES' ? market.yes : market.no;
+  const opposing = side === 'YES' ? market.no : market.yes;
+  if (opposing <= 0) return { multiplier: 1, impliedPct: null, oneSided: true };
+
+  // Limit case for a small stake: total / winning side.
+  const multiplier = sidePool > 0 ? market.pool / sidePool : Infinity;
+  return {
+    multiplier,
+    impliedPct: (multiplier - 1) * 100,
+    oneSided: false,
+  };
+}
+
 /** Settlement payouts for a resolved/settled market.
  *
  * Parimutuel: each winner receives their share of the WHOLE pool in proportion

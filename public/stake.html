@@ -45,6 +45,9 @@
   .opt-name{font-size:16px;font-weight:700;margin-bottom:4px}
   .opt-price{font-size:24px;font-weight:800;color:var(--butter);font-family:ui-monospace,monospace}
   .opt-pool{font-size:11px;color:var(--muted);margin-top:2px}
+  .opt-odds{font-size:11px;color:var(--muted);margin-top:5px;padding-top:5px;
+            border-top:1px solid rgba(125,133,144,.2)}
+  .opt-odds b{color:var(--butter);font-family:ui-monospace,monospace;font-size:13px}
 
   .amount-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
   .amount-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:14px;font-size:18px;font-family:ui-monospace,monospace}
@@ -127,11 +130,13 @@
         <div class="opt-name">Yes</div>
         <div class="opt-price" id="yesPrice">—</div>
         <div class="opt-pool" id="yesPool">0 GEN staked</div>
+        <div class="opt-odds">pays <b id="oddsYes">—</b></div>
       </div>
       <div class="opt-btn" id="optNo" onclick="selectOpt('NO')">
         <div class="opt-name">No</div>
         <div class="opt-price" id="noPrice">—</div>
         <div class="opt-pool" id="noPool">0 GEN staked</div>
+        <div class="opt-odds">pays <b id="oddsNo">—</b></div>
       </div>
     </div>
   </div>
@@ -190,7 +195,7 @@
 </div>
 
 <script type="module">
-import * as gl from './gl-client.v2.js?v=2';
+import * as gl from './gl-client.v2.js?v=4';
 
 const params = new URLSearchParams(location.search);
 const marketId = params.get('id') || 'market-1';
@@ -254,6 +259,37 @@ function calcPayout() {
   const fmt = (n) => (Math.abs(n) < 0.005 ? '0.00' : n.toFixed(2));
   const sign = (n) => (n > 0.005 ? '+' : '');
 
+  // Always show each side's odds on its button, so YES and NO are visibly
+  // different BEFORE any amount is typed. Without this both sides render
+  // "+0.00 GEN / 0%" and look identical (i.e. broken).
+  for (const s of ['YES', 'NO']) {
+    const el = $(s === 'YES' ? 'oddsYes' : 'oddsNo');
+    if (!el) continue;
+    const m = gl.sideMultiplier(market, s);
+    el.textContent = m.oneSided ? '—' : m.multiplier.toFixed(2) + '×';
+  }
+
+  if (amt <= 0) {
+    // Empty state: show the multiplier for the SELECTED side rather than
+    // zeros, so the panel still distinguishes YES from NO.
+    const m = gl.sideMultiplier(market, side);
+    $('winAmt').textContent = m.oneSided ? '1.00× (no opposing stake)' : m.multiplier.toFixed(2) + '× your stake';
+    $('winPct').textContent = m.oneSided ? 'no opposing stake yet' : '+' + m.impliedPct.toFixed(0) + '% if right';
+    $('loseAmt').textContent = 'your stake';
+    $('dStake').textContent = '0.00 GEN';
+    $('dPool').textContent = fmt(market.pool) + ' GEN';
+    $('dProfit').textContent = '—';
+    $('dRoi').textContent = m.oneSided ? '0% (one-sided)' : m.impliedPct.toFixed(0) + '%';
+    $('barSide').textContent = `${side} · enter amount`;
+    $('barPayout').textContent = m.oneSided ? '—' : m.multiplier.toFixed(2) + '×';
+    const b0 = $('stakeBtn');
+    if (market.status === 'OPEN' && gl.isConnected()) {
+      b0.disabled = true;
+      b0.textContent = 'Enter an amount';
+    }
+    return;
+  }
+
   $('winAmt').textContent = '+' + fmt(payout) + ' GEN';
   $('loseAmt').textContent = '-' + fmt(amt) + ' GEN';
   $('dStake').textContent = fmt(amt) + ' GEN';
@@ -262,7 +298,7 @@ function calcPayout() {
 
   // On a one-sided market there is no opposing money to win, so ROI is
   // genuinely 0%. Say so plainly instead of showing a bare "0%".
-  if (amt > 0 && oneSided) {
+  if (oneSided) {
     $('winPct').textContent = 'no opposing stake yet';
     $('dRoi').textContent = '0% (one-sided)';
   } else {
