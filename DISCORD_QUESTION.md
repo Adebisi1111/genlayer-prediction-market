@@ -9,7 +9,16 @@ Web access inside an equivalence-principle block appears to be non-functional on
 |---|---|---|
 | `web_strict` | `gl.nondet.web.render("https://example.com", mode="text")` + `strict_eq` | **`NOT_VOTED`** — 0/5 validators commit, `eqBlocksOutputs` empty, no state write |
 
-A web-backed `resolve()` left to run to completion ends in **`status: ValidatorsTimeout`** after ~29 minutes.
+A web-backed `resolve()` left to run to completion ends in **`ValidatorsTimeout` (statusCode 12)** after ~19 minutes — but critically, the **leader's web fetch and LLM judgment succeed**. Decoding `eqBlocksOutputs` from the final round gives the correct verdict:
+
+```
+eqBlocksOutputs = cd85001c59455386706164646564
+             ->  b'\xcd\x85\x00\x1cYES\x86padded'   # verdict: YES
+```
+
+Final round shows `votesCommitted: 5`, `votesRevealed: 5`, `result: 3` (successful rounds elsewhere show `result: 1`). So all five validators did commit and reveal, yet the transaction is still marked `ValidatorsTimeout` and **no state was written** — the contract stayed `OPEN`.
+
+That reads like: leader fetches fine, validators cannot reproduce the fetch to verify it, so they vote against/time out and the write is discarded.
 | `llm_strict` | `gl.nondet.exec_prompt(...)` + `strict_eq` | `FINISHED_WITH_RETURN`, wrote `YES` in ~30s |
 | `llm_comparative` | `gl.nondet.exec_prompt(...)` + `prompt_comparative` | `FINISHED_WITH_RETURN`, wrote `YES` in ~30s |
 
