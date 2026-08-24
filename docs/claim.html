@@ -144,6 +144,8 @@ window.doConnect = async () => {
 
 async function loadPositions() {
   const me = (gl.getAddress() || '').toLowerCase();
+  let alreadyFailed = [];
+  try { alreadyFailed = JSON.parse(localStorage.getItem('claimFailed:' + (gl.getAddress() || '')) || '[]'); } catch (_) {}
   $('marketsList').innerHTML = '<div class="loading">Reading your positions from chain…</div>';
 
   try {
@@ -167,6 +169,7 @@ async function loadPositions() {
         const winningPool = m.outcome === 'YES' ? m.yes : m.no;
         payout = winningPool > 0 ? (won * m.pool) / winningPool : 0;
         state = won > 0 ? (m.status === 'SETTLED' ? 'claimable' : 'won') : 'lost';
+        if (state === 'claimable' && alreadyFailed.includes(m.id)) state = 'claimedAlready';
       }
       positions.push({ ...m, yesStake: yes, noStake: no, staked, payout, state });
     }
@@ -192,6 +195,7 @@ function render() {
   let won = 0, lost = 0, claimable = 0;
   for (const p of positions) {
     if (p.state === 'claimable') { claimable += p.payout; won += Math.max(p.payout - p.staked, 0); }
+    else if (p.state === 'claimedAlready') { won += Math.max(p.payout - p.staked, 0); }
     else if (p.state === 'won') won += Math.max(p.payout - p.staked, 0);
     else if (p.state === 'lost') lost += p.staked;
   }
@@ -211,6 +215,8 @@ function render() {
         style="width:100%;padding:12px;border:0;border-radius:8px;background:#3fb950;color:#fff;
         font-weight:700;cursor:pointer;font-family:inherit;margin-top:12px">
         Claim ${p.payout.toFixed(2)} GEN</button>`;
+    } else if (p.state === 'claimedAlready') {
+      action = `<div style="margin-top:12px;font-size:13px;color:#7fd897">Already claimed — recorded on chain. Use the Withdraw box above.</div>`;
     } else if (p.state === 'lost') {
       action = `<div style="margin-top:12px;font-size:13px;color:#f85149">Outcome ${p.outcome} — position lost</div>`;
     } else if (p.state === 'won') {
@@ -262,17 +268,33 @@ window.doClaim = async (marketId) => {
     res.style.borderColor = '#f85149';
     res.innerHTML = `<div style="color:#f85149">❌ ${e.message}</div>` +
       `<div style="margin-top:6px;font-size:12px;color:#f8a49a">If this says FINISHED_WITH_ERROR, this position was already claimed. Check your withdrawable balance below.</div>`;
+    // Remember locally so the page stops offering a dead claim.
+    if (/FINISHED_WITH_ERROR/i.test(e.message || '')) {
+      try {
+        const k = 'claimFailed:' + (gl.getAddress() || '');
+        const seen = JSON.parse(localStorage.getItem(k) || '[]');
+        if (!seen.includes(marketId)) { seen.push(marketId); localStorage.setItem(k, JSON.stringify(seen)); }
+        await loadPositions();
+      } catch (_) {}
+    }
+    await refreshPayout();
   }
 };
 
 async function refreshPayout() {
+  const box = $('payoutBox');
+  if (!box) return;
+  box.style.display = 'block';
   try {
     const p = await gl.getMyPayout();
-    const box = $('payoutBox');
-    if (!box) return;
-    box.style.display = p > 0 ? 'block' : 'none';
     $('payoutAmt').textContent = p.toFixed(4) + ' GEN';
-  } catch (e) { /* view unavailable */ }
+    const btn = $('withdrawBtn');
+    btn.disabled = p <= 0;
+    btn.style.opacity = p > 0 ? '1' : '0.45';
+    btn.textContent = p > 0 ? 'Withdraw to wallet' : 'Nothing to withdraw yet';
+  } catch (e) {
+    $('payoutAmt').textContent = 'read failed';
+  }
 }
 
 window.doWithdraw = async () => {
