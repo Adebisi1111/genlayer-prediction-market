@@ -1,5 +1,5 @@
 import { createClient, createAccount } from 'genlayer-js';
-import { testnetBradbury } from 'genlayer-js/chains';
+import * as glChains from 'genlayer-js/chains';
 import { readFileSync } from 'fs';
 import { Wallet } from 'ethers';
 
@@ -9,7 +9,7 @@ const keystore = readFileSync('/home/administrator/.genlayer/keystores/testwalle
 const wallet = Wallet.fromEncryptedJsonSync(keystore, process.env.GLPASS);
 
 const account = createAccount(wallet.privateKey);
-const client = createClient({ chain: testnetBradbury, account });
+const client = createClient({ chain: glChains[process.env.GLCHAIN || 'testnetBradbury'], account });
 
 // REQUIRED before any write — loads the consensus contract ABI/address.
 await client.initializeConsensusSmartContract();
