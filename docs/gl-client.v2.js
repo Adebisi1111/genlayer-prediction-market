@@ -33,7 +33,24 @@
 import { createClient } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
-export const FACTORY = '0xF8bf266694Cc729d9e1032e9dA244febfE10b335';
+// Custom transport that fixes the JSON-RPC id field.
+// GenLayer's Go RPC server requires `id` to be an integer, but viem sends a string.
+function customTransport(url) {
+  return async (req) => {
+    const body = JSON.parse(req.body);
+    if (typeof body.id === 'string') {
+      body.id = parseInt(body.id, 10) || 1;
+    }
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  };
+}
+
+export const FACTORY = '0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275';
 export const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 export const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 export const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
@@ -47,7 +64,7 @@ export const isConnected = () => !!client && !!address;
 
 /** Read-only client that works with no wallet attached. */
 function publicClient() {
-  return createClient({ chain: testnetBradbury });
+  return createClient({ chain: testnetBradbury, transport: customTransport(RPC_URL) });
 }
 
 async function ensureChain() {
@@ -90,6 +107,7 @@ export async function connect() {
     chain: testnetBradbury,
     account: address,
     provider: window.ethereum,
+    transport: customTransport(RPC_URL),
   });
   return address;
 }
@@ -300,7 +318,7 @@ export async function addressBalance(addr) {
  */
 export async function transferEvidence(hash) {
   // A read-only client works without a connected wallet.
-  const c = client || createClient({ chain: testnetBradbury });
+  const c = client || createClient({ chain: testnetBradbury, transport: customTransport(RPC_URL) });
   const tx = await c.getTransaction({ hash });
   if (!tx) return null;
   const msgs = (tx.messages || [])
