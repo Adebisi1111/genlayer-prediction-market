@@ -159,7 +159,9 @@ async function loadPositions() {
         const winningPool = m.outcome === 'YES' ? m.yes : m.no;
         payout = winningPool > 0 ? (won * m.pool) / winningPool : 0;
         state = won > 0 ? (m.status === 'SETTLED' ? 'claimable' : 'won') : 'lost';
-        // Ask the contract whether this wallet already claimed this market.
+        // Authoritative payout + claim flag straight from the contract.
+        const onChain = await gl.payoutOnChain(m.id, myAddr);
+        if (onChain !== null && onChain > 0) payout = onChain;
         if (state === 'claimable' && await gl.isClaimed(m.id, myAddr)) state = 'claimedAlready';
       }
       positions.push({ ...m, yesStake: yes, noStake: no, staked, payout, state });
@@ -207,7 +209,7 @@ function render() {
         font-weight:700;cursor:pointer;font-family:inherit;margin-top:12px">
         Claim ${p.payout.toFixed(2)} GEN</button>`;
     } else if (p.state === 'claimedAlready') {
-      action = `<div style="margin-top:12px;font-size:13px;color:#7fd897">✓ Already claimed — paid out on chain</div>`;
+      action = `<div style="margin-top:12px;font-size:13px;color:#7fd897">✓ Claimed — payout settles on finalization</div>`;
     } else if (p.state === 'lost') {
       action = `<div style="margin-top:12px;font-size:13px;color:#f85149">Outcome ${p.outcome} — position lost</div>`;
     } else if (p.state === 'won') {
@@ -244,7 +246,8 @@ window.doClaim = async (marketId) => {
     const res = $('txResult');
     res.style.display = 'block';
     res.innerHTML =
-      `<div>✅ Claim recorded on chain for ${marketId}</div>` +
+      `<div>✅ Claim accepted on chain for ${marketId}</div>` +
+      `<div style="margin-top:6px;font-size:12px;color:#7fd897">Payout to your wallet executes on finalization (~30 min on Bradbury). The claim is already recorded — nothing more to do.</div>` +
       `<div style="margin-top:8px;font-family:ui-monospace,monospace;font-size:11px;word-break:break-all">${hash}</div>` +
       `<div style="margin-top:8px"><a href="${gl.EXPLORER_TX}${hash}" target="_blank" rel="noopener">View on Explorer</a></div>`;
 
@@ -257,7 +260,7 @@ window.doClaim = async (marketId) => {
     res.style.background = '#2d0a0a';
     res.style.borderColor = '#f85149';
     res.innerHTML = `<div style="color:#f85149">❌ ${e.message}</div>` +
-      `<div style="margin-top:6px;font-size:12px;color:#f8a49a">FINISHED_WITH_ERROR usually means this position was already claimed, or the payout transfer is stuck in Bradbury's finalization queue.</div>`;
+      `<div style="margin-top:6px;font-size:12px;color:#f8a49a">FINISHED_WITH_ERROR here means this position was already claimed, or the market is not settled yet.</div>`;
     await loadPositions();
   }
 };

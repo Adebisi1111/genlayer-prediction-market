@@ -1,7 +1,7 @@
 import { createClient, createAccount } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
-const FACTORY = '0xa8eFc91E9d4e328B774DE04f11A02A3b63617c3E';
+const FACTORY = '0x6765b9c4e9F3b7Ab908a746dA5DB9500b9DbC70F';
 const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
@@ -192,4 +192,10 @@ export function weiToGen(w) { return Number(BigInt(w || '0')) / 1e18; }
 export async function isClaimed(marketId, user) {
   try { return (await read('isClaimed', [marketId, user])) === '1'; }
   catch (e) { return false; }
+}
+
+// v24: exact payout straight from the contract (authoritative, no client-side math).
+export async function payoutOnChain(marketId, user) {
+  try { return Number(BigInt(await read('previewPayout', [marketId, user]) || '0')) / 1e18; }
+  catch (e) { return null; }
 }
