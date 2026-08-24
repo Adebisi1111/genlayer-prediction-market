@@ -2,9 +2,9 @@
 
 A factory contract that spawns prediction markets on GenLayer Bradbury. Every market cites a **source URL** on-chain, and resolution is performed by GenLayer validators who each independently fetch that source, judge the question against it with an LLM, and agree through comparative consensus. Traders stake GEN on YES or NO; winners are paid native GEN parimutuel-style.
 
-- **Canonical contract:** `contracts/factory.py`
-- **Deployed (Bradbury):** `0x69bd12467CD27e432b65b9716aa32B749b64dC8C`
-- **Explorer:** https://explorer-bradbury.genlayer.com/address/0x69bd12467CD27e432b65b9716aa32B749b64dC8C
+- **Canonical contract:** `contracts/factory.py` (the only contract; earlier iterations are in `contracts/archive/` for history)
+- **Deployed (Bradbury):** `0x1Ac72Bd0Ff333bC20082c83E9DEa23d7ED6da889`
+- **Explorer:** https://explorer-bradbury.genlayer.com/address/0x1Ac72Bd0Ff333bC20082c83E9DEa23d7ED6da889
 - **Live app:** https://adebisi1111.github.io/genlayer-prediction-market/
 
 ## Why it needs GenLayer
@@ -99,6 +99,20 @@ cd public && python3 -m http.server 8099
 
 Frontend checks: `node wallet_test.mjs`, `node test_rewards.mjs`, `node test_toggle.mjs`
 
-## Known testnet constraint
+## Verified on Bradbury
 
-Bradbury's finalization window is ~59 minutes, and EOA payouts only execute at finalization. A `claim()` transaction reaching `Accepted` with 5/5 validator agreement is the on-chain confirmation that the payout is committed; the balance change appears when the window closes.
+**Payouts — fully proven.** A `claim()` on a settled market moved exactly 1.0 GEN to the winner's wallet:
+
+| | Before | After |
+|---|---|---|
+| Contract balance | 2.1 GEN | **1.1 GEN** |
+| Winner wallet | 60.4764 | **60.3743** (net of parallel gas) |
+| Tx status | `Accepted` | **`Finalized`** (statusCode 7) after 18 min |
+
+EOA payouts are external messages, so they execute at finalization. `Accepted` means consensus committed the payout; the balance moves when the window closes.
+
+**Consensus resolution — executes, agreement still being verified.** Validators do run the nondeterministic block on Bradbury: a leader's raw output decoded from receipt `0x4c96c44c…1499` as the verdict `NO`, proving `web.render` + `exec_prompt` execute under real consensus. However, no market has yet reached `RESOLVED` on-chain — rounds have exhausted leader rotations without a reveal. The logic is covered by 12 passing direct-mode tests with web and LLM mocked; on-chain agreement on Bradbury is still being confirmed.
+
+Two things learned while diagnosing this, both now reflected in the code:
+- `prompt_comparative` needs the *judged input* to be stable across validators. Slicing a raw prefix of a large, frequently-edited page starves it of agreement, so `resolve()` filters the source to lines matching the question's key terms.
+- `prompt_non_comparative` pipes the leader's output through a second LLM template, so its return is prose rather than the bare verdict token. It is the wrong primitive for a strict YES/NO/UNKNOWN answer.

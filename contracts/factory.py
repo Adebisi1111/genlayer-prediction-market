@@ -91,13 +91,31 @@ class Factory(gl.Contract):
 
         def _judge() -> str:
             page = gl.nondet.web.render(source, mode="text")
+            # Keep only lines that mention the question's key terms. Validators
+            # each fetch the page themselves and a raw prefix slice of a large,
+            # frequently-edited page differs between them, which starves the
+            # equivalence principle of agreement. Filtering to relevant lines
+            # makes the judged input stable across fetches.
+            terms = [w.strip("?$,.").lower() for w in question.split() if len(w) > 3]
+            hits = []
+            for line in page.splitlines():
+                ls = line.strip()
+                if len(ls) < 20:
+                    continue
+                low = ls.lower()
+                if any(t in low for t in terms):
+                    hits.append(ls)
+                if len(hits) >= 40:
+                    break
+            evidence = "\n".join(hits) if hits else page[:2000]
+
             verdict = gl.nondet.exec_prompt(
                 "You are resolving a prediction market from a cited source.\n"
                 f"QUESTION: {question}\n\n"
-                f"SOURCE CONTENT:\n{page[:6000]}\n\n"
-                "Answer with exactly one word: YES if the source shows the "
-                "question resolved true, NO if it shows it resolved false, or "
-                "UNKNOWN if the source does not settle it. One word only."
+                f"SOURCE EXCERPTS:\n{evidence[:4000]}\n\n"
+                "Answer with exactly one word: YES if the excerpts show the "
+                "question resolved true, NO if they show it resolved false, or "
+                "UNKNOWN if they do not settle it. One word only."
             )
             v = verdict.strip().upper()
             # Check UNKNOWN first: a substring scan would match the "NO" inside
@@ -110,10 +128,16 @@ class Factory(gl.Contract):
                 return "NO"
             return "UNKNOWN"
 
+        # Comparative returns _judge()'s own value verbatim, which is what we
+        # need for a strict YES/NO/UNKNOWN token. (prompt_non_comparative pipes
+        # the leader's output through a second LLM template, so the return is
+        # prose rather than the bare verdict.) Agreement therefore depends on
+        # the judged input being stable across validators -- hence the filtered
+        # evidence above rather than a raw page slice.
         outcome = gl.eq_principle.prompt_comparative(
             _judge,
-            "Both answers must state the same verdict: YES, NO, or UNKNOWN "
-            f"for the question: {question}",
+            "Both must give the same one-word verdict (YES, NO, or UNKNOWN) "
+            f"for: {question}",
         )
 
         decided = str(outcome).strip().upper()
