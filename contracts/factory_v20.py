@@ -1,6 +1,7 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
+from genlayer.py.storage import DynArray
 
 class Factory(gl.Contract):
     market_count: u256
@@ -11,6 +12,7 @@ class Factory(gl.Contract):
     m_outcome: TreeMap[str, str]
     m_pool: TreeMap[str, u256]
     m_positions: TreeMap[str, str]
+    claimed: DynArray[str]
 
     @gl.public.write
     def createMarket(self, question: str) -> str:
@@ -77,6 +79,12 @@ class Factory(gl.Contract):
         if self.m_status.get(market_id, "") != "SETTLED":
             raise Exception("Not settled")
         
+        # Prevent repeat claims
+        claim_key = f"{market_id}:{sender}"
+        for c in self.claimed:
+            if c == claim_key:
+                raise Exception("Already claimed")
+        
         outcome = self.m_outcome.get(market_id, "")
         total_pool = int(self.m_pool.get(market_id, u256(0)))
         positions = self.m_positions.get(market_id, "")
@@ -107,9 +115,10 @@ class Factory(gl.Contract):
         if payout <= 0:
             return u256(0)
 
-        # REAL GEN payout. Primitive for THIS runner (from dir(gl) probing):
-        #   gl.get_contract_at(addr).emit_transfer(value=...)
-        # onAcceptance=False, so value moves at FINALIZATION, not ACCEPTED.
+        # Record claim before transfer
+        self.claimed.append(claim_key)
+
+        # REAL GEN payout
         gl.get_contract_at(gl.message.sender_address).emit_transfer(value=u256(payout))
         return u256(payout)
 

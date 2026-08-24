@@ -2,8 +2,8 @@
 
 A factory contract that spawns unlimited prediction markets on GenLayer Bradbury. Markets resolve through **decentralized AI consensus**: validators independently fetch cited web sources, an LLM judges the outcome, and the network reaches comparative consensus. Traders stake GEN on outcomes; winners split the whole pool parimutuel-style.
 
-- **Factory (live):** `0xF8bf266694Cc729d9e1032e9dA244febfE10b335` (Bradbury testnet)
-- **Explorer:** https://explorer-bradbury.genlayer.com/address/0xF8bf266694Cc729d9e1032e9dA244febfE10b335
+- **Factory (live):** `0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275` (Bradbury testnet)
+- **Explorer:** https://explorer-bradbury.genlayer.com/address/0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275
 - **Live app:** https://adebisi1111.github.io/genlayer-prediction-market/
 
 ## Why it needs GenLayer
@@ -12,11 +12,11 @@ A prediction market must decide real-world questions from sources no single node
 
 ## What the factory does
 
-1. **Create markets** — unlimited markets, each with a unique ID, question, resolution rules, and up to 3 cited sources.
+1. **Create markets** — unlimited markets, each with a unique ID and question.
 2. **Stake** — traders stake GEN on YES or NO. Parimutuel odds update live as the pool shifts.
-3. **Resolve** — validators fetch cited web sources, run them through an LLM, and reach comparative consensus (YES / NO / UNRESOLVED).
+3. **Resolve** — validators fetch cited web sources, run them through an LLM, and reach comparative consensus.
 4. **Settle** — locks the winning side once the outcome is decisive.
-5. **Claim** — winners split the whole pool in proportion to their winning stake; payouts are computed and emitted on-chain.
+5. **Claim** — winners split the whole pool in proportion to their winning stake; payouts are computed and emitted on-chain. Each wallet can only claim once per market.
 
 ## Payout math
 
@@ -31,34 +31,27 @@ Example: YES pool 1.0, NO pool 0.4, total 1.4 GEN, outcome YES. A YES staker of 
 ## Contract API
 
 Views (read-only, no gas):
-- `getConfig()` — global config (market count, creator).
-- `getMarket(id)` — full market state: status, outcome, pool, yes/no stakes, positions.
-- `contractBalance()` — GEN held by the factory.
-- `my_bal()` — this caller's GEN balance in the contract (always 0 — no per-wallet escrow).
-- `getCreator()` — the authorized creator address.
+- `getConfig()` — global config (market count).
+- `getMarket(id)` — full market state: status, outcome, pool, positions.
 
 Writes (require connected wallet):
-- `createMarket(question, category, source_url)` — spawn a new market.
+- `createMarket(question)` — spawn a new market.
 - `stake(id, side)` — stake GEN on YES or NO (send value with the call).
 - `resolve(id)` — run validator consensus on the cited sources.
 - `settle(id)` — lock the winning side.
-- `claim(id)` — collect parimutuel winnings.
+- `claim(id)` — collect parimutuel winnings (one-time per wallet).
 
 ## Live data
 
-- **Markets on-chain:** 7 (BTC >$100k, ETH >$5k, Man City PL, Fed cuts Q1, Apple foldable, Nigeria WC, PrimeX accepted)
-- **Total escrowed:** ~10.97 GEN across all markets
-- **Statuses:** 2 settled, 5 open
+- **Markets on-chain:** 0 (fresh deployment)
+- **Total escrowed:** 0 GEN
 - **Staking and payout previews:** the frontend computes live odds from on-chain pool state
 
 ## Run it
 
 ```bash
 # Deploy the factory
-node gl_deploy.mjs contracts/factory_v15.py
-
-# Seed markets
-node seed_m6.mjs
+genlayer deploy --contract contracts/factory_v20.py
 
 # Serve the frontend
 cd public && python3 -m http.server 8099
@@ -78,4 +71,5 @@ node test_toggle.mjs
 ```
 
 ## Rewards Panel
+
 Live at: https://adebisi1111.github.io/genlayer-prediction-market/rewards.html
