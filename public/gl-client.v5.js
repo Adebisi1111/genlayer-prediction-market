@@ -1,7 +1,7 @@
 import { createClient, createAccount } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
-const FACTORY = '0x0c100c4dC2f36e39F75C92f62De86d279eC7fB82';
+const FACTORY = '0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275';
 const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
