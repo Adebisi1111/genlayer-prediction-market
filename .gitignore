@@ -6,3 +6,7 @@ node_modules/
 pm-*.txt
 *-tx.txt
 contract.txt
+
+__pycache__/
+.pytest_cache/
+artifacts/
