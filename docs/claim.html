@@ -106,6 +106,15 @@
   Connect Wallet
 </button>
 
+<div id="payoutBox" style="display:none;background:#0a2d12;border:1px solid #3fb950;border-radius:12px;padding:18px;margin-bottom:20px">
+  <div style="font-size:12px;color:#7fd897;letter-spacing:.5px;margin-bottom:6px">WITHDRAWABLE BALANCE</div>
+  <div id="payoutAmt" style="font-size:26px;font-weight:800;color:#3fb950;font-family:ui-monospace,monospace">0.0000 GEN</div>
+  <button id="withdrawBtn" onclick="doWithdraw()"
+    style="width:100%;padding:13px;border:0;border-radius:8px;background:#3fb950;color:#04140a;
+    font-weight:800;cursor:pointer;font-family:inherit;margin-top:14px;font-size:15px">
+    Withdraw to wallet</button>
+</div>
+
 <!-- Real on-chain data via genlayer-js. Never call GenLayer contracts with
      ethers/viem aimed at the contract address — calls must route through
      ConsensusMain. See genlayer-client.js. -->
@@ -125,6 +134,7 @@ window.doConnect = async () => {
     btn.textContent = addr.slice(0, 6) + '…' + addr.slice(-4);
     btn.disabled = true;
     await loadPositions();
+    await refreshPayout();
   } catch (e) {
     btn.textContent = 'Connect Wallet';
     $('marketsList').innerHTML =
@@ -243,8 +253,45 @@ window.doClaim = async (marketId) => {
 
     $('balance').textContent = (await gl.getBalance()).toFixed(4) + ' GEN';
     await loadPositions();
+    await refreshPayout();
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = original; }
+    const res = $('txResult');
+    res.style.display = 'block';
+    res.style.background = '#2d0a0a';
+    res.style.borderColor = '#f85149';
+    res.innerHTML = `<div style="color:#f85149">❌ ${e.message}</div>` +
+      `<div style="margin-top:6px;font-size:12px;color:#f8a49a">If this says FINISHED_WITH_ERROR, this position was already claimed. Check your withdrawable balance below.</div>`;
+  }
+};
+
+async function refreshPayout() {
+  try {
+    const p = await gl.getMyPayout();
+    const box = $('payoutBox');
+    if (!box) return;
+    box.style.display = p > 0 ? 'block' : 'none';
+    $('payoutAmt').textContent = p.toFixed(4) + ' GEN';
+  } catch (e) { /* view unavailable */ }
+}
+
+window.doWithdraw = async () => {
+  const btn = $('withdrawBtn');
+  const original = btn.textContent;
+  try {
+    btn.disabled = true; btn.textContent = 'Confirm in wallet… (~30-60s)';
+    const { hash } = await gl.withdrawPayout();
+    const res = $('txResult');
+    res.style.display = 'block';
+    res.style.background = '#0a2d12';
+    res.style.borderColor = '#3fb950';
+    res.innerHTML = `<div style="color:#3fb950">✅ Withdraw sent</div>` +
+      `<div style="margin-top:8px;font-family:ui-monospace,monospace;font-size:11px;word-break:break-all">${hash}</div>` +
+      `<div style="margin-top:8px"><a href="${gl.EXPLORER_TX}${hash}" target="_blank" rel="noopener">View on Explorer</a></div>`;
+    $('balance').textContent = (await gl.getBalance()).toFixed(4) + ' GEN';
+    await refreshPayout();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = original;
     const res = $('txResult');
     res.style.display = 'block';
     res.style.background = '#2d0a0a';
