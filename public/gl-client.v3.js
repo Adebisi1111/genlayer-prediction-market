@@ -6,7 +6,6 @@ const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
 const CHAIN_ID = 4221;
 
-// Contract ABI (only the functions we need)
 const ABI = [
   'function createMarket(string question) returns (string)',
   'function stake(string marketId, string option) payable',
@@ -23,6 +22,7 @@ let address = null;
 
 export const getAddress = () => address;
 export const isConnected = () => !!provider && !!address;
+export const EXPLORER = EXPLORER_TX;
 
 async function ensureChain() {
   const current = await window.ethereum.request({ method: 'eth_chainId' });
@@ -61,11 +61,7 @@ export async function connect() {
   return address;
 }
 
-export function disconnect() {
-  provider = null;
-  signer = null;
-  address = null;
-}
+export function disconnect() { provider = null; signer = null; address = null; }
 
 export async function read(functionName, args = []) {
   const p = provider || new ethers.JsonRpcProvider(RPC_URL);
@@ -84,12 +80,10 @@ export async function write(functionName, args = [], genAmount = '0') {
 
 export async function getBalance() {
   if (!address || !provider) return 0;
-  const bal = await provider.getBalance(address);
-  return Number(bal) / 1e18;
+  return Number(await provider.getBalance(address)) / 1e18;
 }
 
-// Parse market data
-function parseMarket(id, raw) {
+function parseRaw(id, raw) {
   if (!raw || raw === 'NOT_FOUND') return null;
   const parts = String(raw).split('|');
   const question = parts[0] ?? '';
@@ -97,7 +91,6 @@ function parseMarket(id, raw) {
   const outcome = parts[2] ?? '';
   const pool = Number(BigInt(parts[3] || '0')) / 1e18;
   const positions = parts[4] ?? '';
-  
   let yes = 0, no = 0;
   const holders = [];
   for (const p of positions.split('|')) {
@@ -108,74 +101,45 @@ function parseMarket(id, raw) {
     if (seg[1] === 'YES') yes += gen; else if (seg[1] === 'NO') no += gen;
     holders.push({ address: seg[0], side: seg[1], amount: gen });
   }
-  
   const total = yes + no;
-  return {
-    id, question, status, outcome, pool, yes, no, holders,
-    yesPrice: total > 0 ? yes / total : 0.5,
-    noPrice: total > 0 ? no / total : 0.5,
-  };
+  return { id, question, status, outcome, pool, yes, no, holders,
+           yesPrice: total > 0 ? yes / total : 0.5, noPrice: total > 0 ? no / total : 0.5 };
+}
+
+export function parseMarket(id, raw) { return parseRaw(id, raw); }
+
+export async function getMarket(id) {
+  return parseRaw(id, await read('getMarket', [id]));
 }
 
 export async function loadMarkets() {
   const count = parseInt(await read('getConfig', []));
   const markets = [];
   for (let i = 1; i <= count; i++) {
-    const raw = await read('getMarket', [`market-${i}`]);
-    const m = parseMarket(`market-${i}`, raw);
+    const m = parseRaw(`market-${i}`, await read('getMarket', [`market-${i}`]));
     if (m) markets.push(m);
   }
   return markets;
 }
 
-export async function getMarket(id) {
-  const raw = await read('getMarket', [id]);
-  return parseMarket(id, raw);
-}
-
-export async function stake(marketId, side, genAmount) {
-  return write('stake', [marketId, side], genAmount);
-}
-
-export async function createMarket(question) {
-  return write('createMarket', [question], '0');
-}
-
-export async function resolve(marketId) {
-  return write('resolve', [marketId], '0');
-}
-
-export async function settle(marketId) {
-  return write('settle', [marketId], '0');
-}
-
-export async function claim(marketId) {
-  return write('claim', [marketId], '0');
-}
+export async function stake(marketId, side, genAmount) { return write('stake', [marketId, side], genAmount); }
+export async function createMarket(question) { return write('createMarket', [question], '0'); }
+export async function resolve(marketId) { return write('resolve', [marketId], '0'); }
+export async function settle(marketId) { return write('settle', [marketId], '0'); }
+export async function claim(marketId) { return write('claim', [marketId], '0'); }
 
 export function previewPayout(market, side, stakeGen) {
   const amt = parseFloat(stakeGen) || 0;
   if (amt <= 0) return { payout: 0, profit: 0, roi: 0, opposing: 0, oneSided: false };
-  
   const sidePool = side === 'YES' ? market.yes : market.no;
   const opposing = side === 'YES' ? market.no : market.yes;
-  
   const winningPool = sidePool + amt;
   const totalPool = market.pool + amt;
-  
   let payout = winningPool > 0 ? (amt * totalPool) / winningPool : amt;
-  
   if (!isFinite(payout) || payout < 0) payout = 0;
   const profit = Math.abs(payout - amt) < 1e-12 ? 0 : payout - amt;
   const roi = amt > 0 ? (profit / amt) * 100 : 0;
-  
-  return {
-    payout,
-    profit,
-    roi: Object.is(roi, -0) ? 0 : roi,
-    opposing,
-    oneSided: opposing <= 0,
-  };
+  return { payout, profit, roi: Object.is(roi, -0) ? 0 : roi, opposing, oneSided: opposing <= 0 };
 }
 
 export function sideMultiplier(market, side) {
@@ -185,6 +149,4 @@ export function sideMultiplier(market, side) {
   return (opposing + sidePool) / sidePool;
 }
 
-export function weiToGen(w) {
-  return Number(BigInt(w || '0')) / 1e18;
-}
+export function weiToGen(w) { return Number(BigInt(w || '0')) / 1e18; }
