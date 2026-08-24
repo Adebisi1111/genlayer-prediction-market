@@ -1,0 +1,52 @@
+import { createClient, createAccount } from 'genlayer-js';
+import { testnetBradbury } from 'genlayer-js/chains';
+import { readFileSync } from 'fs';
+import { Wallet } from 'ethers';
+
+const FACTORY = '0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275';
+const keystore = readFileSync('/home/administrator/.genlayer/keystores/testwallet.json', 'utf8');
+const wallet = Wallet.fromEncryptedJsonSync(keystore, 'genlayer2026');
+
+const account = createAccount(wallet.privateKey);
+
+// Custom transport that fixes JSON-RPC id
+function customTransport(url) {
+  return async (req) => {
+    const body = JSON.parse(req.body);
+    if (typeof body.id === 'string') {
+      body.id = parseInt(body.id, 10) || 1;
+    }
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  };
+}
+
+const client = createClient({ 
+  chain: testnetBradbury, 
+  account,
+  transport: customTransport('https://rpc-bradbury.genlayer.com'),
+});
+
+await client.initializeConsensusSmartContract();
+
+const markets = [
+  'Will Bitcoin exceed $100,000 by December 2026?',
+  'Will Ethereum exceed $5,000 by December 2026?',
+  'Will Man City win the Premier League?',
+];
+
+for (const q of markets) {
+  try {
+    const hash = await client.writeContract({ address: FACTORY, functionName: 'createMarket', args: [q], value: '0' });
+    console.log(`Created: ${q} -> ${hash}`);
+  } catch (e) {
+    console.log(`Error: ${q} -> ${e.message?.slice(0, 200)}`);
+  }
+}
+
+const count = await client.readContract({ address: FACTORY, functionName: 'getConfig', args: [] });
+console.log('Total markets:', count);

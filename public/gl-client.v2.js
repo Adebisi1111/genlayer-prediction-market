@@ -33,22 +33,21 @@
 import { createClient } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
-// Custom transport that fixes the JSON-RPC id field.
+// Global fetch interceptor to fix JSON-RPC id field.
 // GenLayer's Go RPC server requires `id` to be an integer, but viem sends a string.
-function customTransport(url) {
-  return async (req) => {
-    const body = JSON.parse(req.body);
-    if (typeof body.id === 'string') {
-      body.id = parseInt(body.id, 10) || 1;
-    }
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    return res.json();
-  };
-}
+const _origFetch = window.fetch;
+window.fetch = async (input, init) => {
+  if (init?.body && typeof init.body === 'string') {
+    try {
+      const body = JSON.parse(init.body);
+      if (body.jsonrpc === '2.0' && typeof body.id === 'string') {
+        body.id = parseInt(body.id, 10) || 1;
+        init = { ...init, body: JSON.stringify(body) };
+      }
+    } catch {}
+  }
+  return _origFetch(input, init);
+};
 
 export const FACTORY = '0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275';
 export const RPC_URL = 'https://rpc-bradbury.genlayer.com';
@@ -64,7 +63,7 @@ export const isConnected = () => !!client && !!address;
 
 /** Read-only client that works with no wallet attached. */
 function publicClient() {
-  return createClient({ chain: testnetBradbury, transport: customTransport(RPC_URL) });
+  return createClient({ chain: testnetBradbury });
 }
 
 async function ensureChain() {
@@ -107,7 +106,6 @@ export async function connect() {
     chain: testnetBradbury,
     account: address,
     provider: window.ethereum,
-    transport: customTransport(RPC_URL),
   });
   return address;
 }
