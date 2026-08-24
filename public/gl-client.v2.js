@@ -50,7 +50,7 @@ function customTransport(url) {
   };
 }
 
-export const FACTORY = '0xF8bf266694Cc729d9e1032e9dA244febfE10b335';
+export const FACTORY = '0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275';
 export const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 export const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 export const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
