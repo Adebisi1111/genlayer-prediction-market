@@ -344,16 +344,22 @@ window.hideCreate = () => { $('createModal').style.display = 'none'; };
 window.submitCreate = async () => {
   const q = $('qQuestion').value.trim();
   if (!q) { alert('Enter a question.'); return; }
+  const src = $('qSource1').value.trim();
+  if (!/^https?:\/\//.test(src)) {
+    alert('A source URL (http/https) is required — validators resolve the market by reading it.\n\nUse an HTML page: web.render() returns empty text for PDFs.');
+    return;
+  }
 
   const btn = document.querySelector('#createModal .btn-primary');
   const original = btn.textContent;
   try {
     btn.disabled = true;
     btn.textContent = 'Confirm in wallet… (~30-60s)';
-    const { hash } = await gl.createMarket(q);
+    const { hash } = await gl.createMarket(q, src);
     $('createModal').style.display = 'none';
     alert('Market created on chain.\n\n' + hash);
     $('qQuestion').value = '';
+    $('qSource1').value = '';
     await loadMarkets();
   } catch (e) {
     alert('Create failed: ' + e.message);

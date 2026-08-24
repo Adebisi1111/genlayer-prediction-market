@@ -107,15 +107,14 @@
   <b>How settlement works.</b> Payout tables above are computed from live on-chain
   positions using the same parimutuel formula the contract runs:
   <code>your_stake ÷ winning_pool × total_pool</code>.
-  Calling <code>claim</code> executes that math on-chain and the contract emits a
-  GEN transfer message to the winner via
-  <code>emit_transfer(value=…, on=…)</code>. These emitted transfers settle at
-  network <b>finalization</b>. On the Bradbury testnet, transactions have been
-  observed holding at <b>ACCEPTED</b> without progressing to FINALIZED, so a
-  payout can be correctly computed, executed and recorded on-chain while the
-  balance credit remains pending at the network layer — verified across
-  multiple contracts with both <code>on='accepted'</code> and
-  <code>on='finalized'</code>. Escrow deposits settle normally. Every figure on
+  Calling <code>claim</code> executes that math on-chain and pays the winner in
+  native GEN. Paying a wallet is an <b>external message</b>, so the contract uses
+  <code>@gl.evm.contract_interface</code> and the transfer executes at network
+  <b>finalization</b> — <code>gl.get_contract_at(wallet).emit_transfer()</code> is
+  contract-to-contract only and moves nothing when the target is a wallet.
+  Verified on Bradbury: a claim moved the contract balance from 2.1 to 1.1 GEN and
+  reached <b>FINALIZED</b>. A claim sitting at ACCEPTED is committed but not yet
+  credited; the balance moves when the finalization window closes. Every figure on
   this page is derived from live chain state, never from a database.
 </div>
 
