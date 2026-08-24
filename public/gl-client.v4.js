@@ -172,8 +172,21 @@ export function previewPayout(market, side, stakeGen) {
 export function sideMultiplier(market, side) {
   const sidePool = side === 'YES' ? market.yes : market.no;
   const opposing = side === 'YES' ? market.no : market.yes;
-  if (sidePool <= 0) return opposing > 0 ? Infinity : 1;
-  return (opposing + sidePool) / sidePool;
+  const total = market.yes + market.no;
+  if (total <= 0) {
+    return { empty: true, oneSided: true, multiplier: 1, impliedPct: 0, opposing: 0 };
+  }
+  if (sidePool <= 0) {
+    return { empty: false, oneSided: true, multiplier: Infinity, impliedPct: Infinity, opposing };
+  }
+  const multiplier = (sidePool + opposing) / sidePool;
+  return {
+    empty: false,
+    oneSided: opposing <= 0,
+    multiplier,
+    impliedPct: (multiplier - 1) * 100,
+    opposing,
+  };
 }
 
 export function weiToGen(w) { return Number(BigInt(w || '0')) / 1e18; }
