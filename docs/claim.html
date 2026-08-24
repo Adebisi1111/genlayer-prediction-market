@@ -106,14 +106,6 @@
   Connect Wallet
 </button>
 
-<div id="payoutBox" style="display:none;background:#0a2d12;border:1px solid #3fb950;border-radius:12px;padding:18px;margin-bottom:20px">
-  <div style="font-size:12px;color:#7fd897;letter-spacing:.5px;margin-bottom:6px">WITHDRAWABLE BALANCE</div>
-  <div id="payoutAmt" style="font-size:26px;font-weight:800;color:#3fb950;font-family:ui-monospace,monospace">0.0000 GEN</div>
-  <button id="withdrawBtn" onclick="doWithdraw()"
-    style="width:100%;padding:13px;border:0;border-radius:8px;background:#3fb950;color:#04140a;
-    font-weight:800;cursor:pointer;font-family:inherit;margin-top:14px;font-size:15px">
-    Withdraw to wallet</button>
-</div>
 
 <!-- Real on-chain data via genlayer-js. Never call GenLayer contracts with
      ethers/viem aimed at the contract address — calls must route through
@@ -134,7 +126,6 @@ window.doConnect = async () => {
     btn.textContent = addr.slice(0, 6) + '…' + addr.slice(-4);
     btn.disabled = true;
     await loadPositions();
-    await refreshPayout();
   } catch (e) {
     btn.textContent = 'Connect Wallet';
     $('marketsList').innerHTML =
@@ -144,8 +135,7 @@ window.doConnect = async () => {
 
 async function loadPositions() {
   const me = (gl.getAddress() || '').toLowerCase();
-  let alreadyFailed = [];
-  try { alreadyFailed = JSON.parse(localStorage.getItem('claimFailed:' + (gl.getAddress() || '')) || '[]'); } catch (_) {}
+  const myAddr = gl.getAddress() || '';
   $('marketsList').innerHTML = '<div class="loading">Reading your positions from chain…</div>';
 
   try {
@@ -169,7 +159,8 @@ async function loadPositions() {
         const winningPool = m.outcome === 'YES' ? m.yes : m.no;
         payout = winningPool > 0 ? (won * m.pool) / winningPool : 0;
         state = won > 0 ? (m.status === 'SETTLED' ? 'claimable' : 'won') : 'lost';
-        if (state === 'claimable' && alreadyFailed.includes(m.id)) state = 'claimedAlready';
+        // Ask the contract whether this wallet already claimed this market.
+        if (state === 'claimable' && await gl.isClaimed(m.id, myAddr)) state = 'claimedAlready';
       }
       positions.push({ ...m, yesStake: yes, noStake: no, staked, payout, state });
     }
@@ -216,7 +207,7 @@ function render() {
         font-weight:700;cursor:pointer;font-family:inherit;margin-top:12px">
         Claim ${p.payout.toFixed(2)} GEN</button>`;
     } else if (p.state === 'claimedAlready') {
-      action = `<div style="margin-top:12px;font-size:13px;color:#7fd897">Already claimed — recorded on chain. Use the Withdraw box above.</div>`;
+      action = `<div style="margin-top:12px;font-size:13px;color:#7fd897">✓ Already claimed — paid out on chain</div>`;
     } else if (p.state === 'lost') {
       action = `<div style="margin-top:12px;font-size:13px;color:#f85149">Outcome ${p.outcome} — position lost</div>`;
     } else if (p.state === 'won') {
@@ -259,7 +250,6 @@ window.doClaim = async (marketId) => {
 
     $('balance').textContent = (await gl.getBalance()).toFixed(4) + ' GEN';
     await loadPositions();
-    await refreshPayout();
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = original; }
     const res = $('txResult');
@@ -267,60 +257,12 @@ window.doClaim = async (marketId) => {
     res.style.background = '#2d0a0a';
     res.style.borderColor = '#f85149';
     res.innerHTML = `<div style="color:#f85149">❌ ${e.message}</div>` +
-      `<div style="margin-top:6px;font-size:12px;color:#f8a49a">If this says FINISHED_WITH_ERROR, this position was already claimed. Check your withdrawable balance below.</div>`;
-    // Remember locally so the page stops offering a dead claim.
-    if (/FINISHED_WITH_ERROR/i.test(e.message || '')) {
-      try {
-        const k = 'claimFailed:' + (gl.getAddress() || '');
-        const seen = JSON.parse(localStorage.getItem(k) || '[]');
-        if (!seen.includes(marketId)) { seen.push(marketId); localStorage.setItem(k, JSON.stringify(seen)); }
-        await loadPositions();
-      } catch (_) {}
-    }
-    await refreshPayout();
+      `<div style="margin-top:6px;font-size:12px;color:#f8a49a">FINISHED_WITH_ERROR usually means this position was already claimed, or the payout transfer is stuck in Bradbury's finalization queue.</div>`;
+    await loadPositions();
   }
 };
 
-async function refreshPayout() {
-  const box = $('payoutBox');
-  if (!box) return;
-  box.style.display = 'block';
-  try {
-    const p = await gl.getMyPayout();
-    $('payoutAmt').textContent = p.toFixed(4) + ' GEN';
-    const btn = $('withdrawBtn');
-    btn.disabled = p <= 0;
-    btn.style.opacity = p > 0 ? '1' : '0.45';
-    btn.textContent = p > 0 ? 'Withdraw to wallet' : 'Nothing to withdraw yet';
-  } catch (e) {
-    $('payoutAmt').textContent = 'read failed';
-  }
-}
 
-window.doWithdraw = async () => {
-  const btn = $('withdrawBtn');
-  const original = btn.textContent;
-  try {
-    btn.disabled = true; btn.textContent = 'Confirm in wallet… (~30-60s)';
-    const { hash } = await gl.withdrawPayout();
-    const res = $('txResult');
-    res.style.display = 'block';
-    res.style.background = '#0a2d12';
-    res.style.borderColor = '#3fb950';
-    res.innerHTML = `<div style="color:#3fb950">✅ Withdraw sent</div>` +
-      `<div style="margin-top:8px;font-family:ui-monospace,monospace;font-size:11px;word-break:break-all">${hash}</div>` +
-      `<div style="margin-top:8px"><a href="${gl.EXPLORER_TX}${hash}" target="_blank" rel="noopener">View on Explorer</a></div>`;
-    $('balance').textContent = (await gl.getBalance()).toFixed(4) + ' GEN';
-    await refreshPayout();
-  } catch (e) {
-    btn.disabled = false; btn.textContent = original;
-    const res = $('txResult');
-    res.style.display = 'block';
-    res.style.background = '#2d0a0a';
-    res.style.borderColor = '#f85149';
-    res.innerHTML = `<div style="color:#f85149">❌ ${e.message}</div>`;
-  }
-};
 
 $('marketsList').innerHTML =
   '<div class="empty"><div class="empty-icon">🔗</div><div>Connect your wallet to view positions</div></div>';
