@@ -8,6 +8,8 @@ Web access inside an equivalence-principle block appears to be non-functional on
 | Method | Primitive | Result |
 |---|---|---|
 | `web_strict` | `gl.nondet.web.render("https://example.com", mode="text")` + `strict_eq` | **`NOT_VOTED`** — 0/5 validators commit, `eqBlocksOutputs` empty, no state write |
+
+A web-backed `resolve()` left to run to completion ends in **`status: ValidatorsTimeout`** after ~29 minutes.
 | `llm_strict` | `gl.nondet.exec_prompt(...)` + `strict_eq` | `FINISHED_WITH_RETURN`, wrote `YES` in ~30s |
 | `llm_comparative` | `gl.nondet.exec_prompt(...)` + `prompt_comparative` | `FINISHED_WITH_RETURN`, wrote `YES` in ~30s |
 
@@ -33,7 +35,7 @@ def web_strict(self) -> str:
 
 Nothing exotic — `example.com`, `mode="text"`, `strict_eq`, single return value.
 
-**In a real contract** (prediction market resolving from a cited source URL) the same call stalls in leader rotation: rounds reach 4 `votesCommitted` / **0 `votesRevealed`**, then rotate until rotations are exhausted. Tried both a large page (Wikipedia) and a small immutable one (`bitcoin.org/bitcoin.pdf`), and both `prompt_comparative` and `strict_eq` — identical stall, so it isn't input drift or the choice of equivalence principle.
+**In a real contract** (prediction market resolving from a cited source URL) the same call stalls in leader rotation: rounds reach 4 `votesCommitted` / **0 `votesRevealed`**, rotate until rotations are exhausted, and terminate in **`ValidatorsTimeout`** (~29 min). Tried both a large page (Wikipedia) and a small immutable one (`bitcoin.org/bitcoin.pdf`), and both `prompt_comparative` and `strict_eq` — identical stall, so it isn't input drift or the choice of equivalence principle.
 
 Contract: `0x1Ac72Bd0Ff333bC20082c83E9DEa23d7ED6da889`
 Stalled resolve: `0x560817e953cde48347aacac76def02901fdb39c46bbc4a910cac20ea7d677fa1`
