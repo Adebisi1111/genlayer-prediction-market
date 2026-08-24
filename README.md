@@ -76,3 +76,6 @@ node test_rewards.mjs
 # YES/NO payout toggle
 node test_toggle.mjs
 ```
+
+## Rewards Panel
+Live at: https://adebisi1111.github.io/genlayer-prediction-market/rewards.html
