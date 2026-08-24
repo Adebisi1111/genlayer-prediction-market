@@ -128,10 +128,10 @@ const f = (n, d = 4) => n.toFixed(d).replace(/\.?0+$/, '') || '0';
 
 $('ctrLink').href = gl.EXPLORER_ADDR + gl.FACTORY;
 
-// Known claim txs whose emitted transfer we can show as evidence.
-// These are real txs produced by the payout path.
+// Verified claim tx: this payout moved the contract balance 2.1 -> 1.1 GEN
+// and reached FINALIZED, confirming the @gl.evm.contract_interface path.
 const CLAIM_TXS = [
-  '0xe0751d2e0f17c76de2a13ab3dc30b62133dd5bfb01cc43c545ebfe290c92fb0a',
+  '0x645e767d4c2747460801779ebd015c7797d6efada54e26a5950004f19e15ee78',
 ];
 
 function payoutTable(market, me) {
