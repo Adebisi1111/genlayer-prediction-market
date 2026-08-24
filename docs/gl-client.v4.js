@@ -101,7 +101,11 @@ export async function getBalance() {
 }
 
 function parseRaw(id, raw) {
-  if (!raw || raw === 'NOT_FOUND') return null;
+  if (!raw || typeof raw !== 'string') {
+    console.log('parseRaw: invalid raw', typeof raw, raw?.slice?.(0, 100));
+    return null;
+  }
+  if (raw === 'NOT_FOUND') return null;
   const parts = String(raw).split('|');
   const question = parts[0] ?? '';
   const status = parts[1] ?? '';

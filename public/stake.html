@@ -216,15 +216,16 @@ function showTx(html, ok = true) {
 async function loadMarket() {
   try {
     const raw = await gl.read('getMarket', [marketId]);
+    console.log('loadMarket raw:', typeof raw, raw?.slice?.(0, 100));
     market = gl.parseMarket(marketId, raw);
     if (!market) { $('q').textContent = 'Market not found on chain'; return; }
 
     $('q').textContent = market.question;
-    $('poolVal').textContent = market.pool.toFixed(2) + ' GEN';
-    $('yesPrice').textContent = Math.round(market.yesPrice * 100) + '¢';
-    $('noPrice').textContent = Math.round(market.noPrice * 100) + '¢';
-    $('yesPool').textContent = market.yes.toFixed(2) + ' GEN staked';
-    $('noPool').textContent = market.no.toFixed(2) + ' GEN staked';
+    $('poolVal').textContent = (market.pool || 0).toFixed(2) + ' GEN';
+    $('yesPrice').textContent = Math.round((market.yesPrice || 0) * 100) + '¢';
+    $('noPrice').textContent = Math.round((market.noPrice || 0) * 100) + '¢';
+    $('yesPool').textContent = (market.yes || 0).toFixed(2) + ' GEN staked';
+    $('noPool').textContent = (market.no || 0).toFixed(2) + ' GEN staked';
 
     const badge = $('statusBadge');
     badge.textContent = market.status;
