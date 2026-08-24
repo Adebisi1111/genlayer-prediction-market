@@ -1,7 +1,7 @@
 import { createClient, createAccount } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
-const FACTORY = '0x6765b9c4e9F3b7Ab908a746dA5DB9500b9DbC70F';
+const FACTORY = '0x69bd12467CD27e432b65b9716aa32B749b64dC8C';
 const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
@@ -113,6 +113,7 @@ function parseRaw(id, raw) {
   const outcome = parts[2] ?? '';
   const pool = Number(BigInt(parts[3] || '0')) / 1e18;
   const positions = parts[4] ?? '';
+  const sourceUrl = parts[5] ?? '';
   let yes = 0, no = 0;
   const holders = [];
   for (const p of positions.split('|')) {
@@ -125,7 +126,7 @@ function parseRaw(id, raw) {
   }
   const total = yes + no;
   return {
-    id, question, status, outcome, pool: pool || 0, yes: yes || 0, no: no || 0, holders,
+    id, question, status, outcome, sourceUrl, pool: pool || 0, yes: yes || 0, no: no || 0, holders,
     yesPrice: total > 0 ? yes / total : 0.5,
     noPrice: total > 0 ? no / total : 0.5,
     empty: total <= 0,
@@ -149,14 +150,18 @@ export async function loadMarkets() {
   return markets;
 }
 
-export async function getPayout(user) { return read('getPayout', [user]); }
 export async function getMarket(id) {
   const raw = await read('getMarket', [id]);
   return parseRaw(id, raw);
 }
 
 export async function stake(marketId, side, genAmount) { return write('stake', [marketId, side], genAmount); }
-export async function createMarket(question) { return write('createMarket', [question], '0'); }
+export async function createMarket(question, sourceUrl) {
+  if (!/^https?:\/\//.test(String(sourceUrl || ''))) {
+    throw new Error('A source URL (http/https) is required — validators resolve the market by reading it.');
+  }
+  return write('createMarket', [question, sourceUrl], '0');
+}
 export async function resolve(marketId) { return write('resolve', [marketId], '0'); }
 export async function settle(marketId) { return write('settle', [marketId], '0'); }
 export async function claim(marketId) { return write('claim', [marketId], '0'); }
@@ -198,4 +203,9 @@ export async function isClaimed(marketId, user) {
 export async function payoutOnChain(marketId, user) {
   try { return Number(BigInt(await read('previewPayout', [marketId, user]) || '0')) / 1e18; }
   catch (e) { return null; }
+}
+
+// Canonical contract: the cited source validators read to resolve a market.
+export async function getSource(marketId) {
+  try { return await read('getSource', [marketId]); } catch (e) { return ''; }
 }

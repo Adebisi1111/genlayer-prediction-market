@@ -231,6 +231,7 @@ function render() {
           <span>Market pool · status</span>
           <span style="color:#e8c98a;font-family:ui-monospace,monospace">${p.pool.toFixed(2)} GEN · ${p.status}</span>
         </div>
+        ${p.sourceUrl ? `<div style="margin-top:8px;font-size:12px;color:#7a8a9a">Resolved by validator consensus from <a href="${p.sourceUrl}" target="_blank" rel="noopener" style="color:#58a6ff;word-break:break-all">${p.sourceUrl}</a></div>` : ''}
         ${action}
       </div>`;
   }).join('');
