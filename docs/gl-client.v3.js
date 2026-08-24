@@ -12,8 +12,8 @@ const ABI = [
   'function resolve(string marketId)',
   'function settle(string marketId)',
   'function claim(string marketId) returns (uint256)',
-  'function getMarket(string marketId) returns (string)',
-  'function getConfig() returns (string)',
+  'function getMarket(string marketId) view returns (string)',
+  'function getConfig() view returns (string)',
 ];
 
 let provider = null;
