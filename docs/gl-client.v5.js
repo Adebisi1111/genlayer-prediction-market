@@ -1,7 +1,7 @@
 import { createClient, createAccount } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
-const FACTORY = '0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275';
+const FACTORY = '0x0c100c4dC2f36e39F75C92f62De86d279eC7fB82';
 const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
@@ -187,3 +187,13 @@ export function sideMultiplier(market, side) {
 }
 
 export function weiToGen(w) { return Number(BigInt(w || '0')) / 1e18; }
+
+// Payout helpers for v22 pull-pattern
+export async function claimPayout(marketId) { return write('claim', [marketId], '0'); }
+export async function withdrawPayout() { return write('withdraw', [], '0'); }
+export async function getMyPayout() {
+  const a = getAddress();
+  if (!a) return 0;
+  const raw = await read('getPayout', [a]);
+  return Number(BigInt(raw || '0')) / 1e18;
+}
