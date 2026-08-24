@@ -119,8 +119,16 @@ function parseRaw(id, raw) {
     holders.push({ address: seg[0], side: seg[1], amount: gen });
   }
   const total = yes + no;
-  return { id, question, status, outcome, pool, yes, no, holders,
-           yesPrice: total > 0 ? yes / total : 0.5, noPrice: total > 0 ? no / total : 0.5 };
+  return {
+    id, question, status, outcome, pool: pool || 0, yes: yes || 0, no: no || 0, holders,
+    yesPrice: total > 0 ? yes / total : 0.5,
+    noPrice: total > 0 ? no / total : 0.5,
+    empty: total <= 0,
+    oneSided: yes <= 0 || no <= 0,
+    multiplier: total > 0 ? (yes + no) / Math.max(yes, no) : 1,
+    impliedPct: total > 0 ? ((yes + no) / Math.max(yes, no) - 1) * 100 : 0,
+    opposing: 0,
+  };
 }
 
 export function parseMarket(id, raw) { return parseRaw(id, raw); }
