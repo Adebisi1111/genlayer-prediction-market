@@ -217,8 +217,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 <!-- Real on-chain data via genlayer-js. Do NOT swap this for ethers/viem
      pointed at the contract address: GenLayer calls must route through
      ConsensusMain, which genlayer-js handles. See genlayer-client.js. -->
+<script src="./rpc-fix.js"></script>
 <script type="module">
-import * as gl from './gl-client.v4.js';
+import * as gl from './gl-client.v2.js';
 
 let markets = [];
 let filter = 'all';

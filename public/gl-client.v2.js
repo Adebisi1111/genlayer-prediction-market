@@ -33,22 +33,6 @@
 import { createClient } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
-// Global fetch interceptor to fix JSON-RPC id field.
-// GenLayer's Go RPC server requires `id` to be an integer, but viem sends a string.
-const _origFetch = window.fetch;
-window.fetch = async (input, init) => {
-  if (init?.body && typeof init.body === 'string') {
-    try {
-      const body = JSON.parse(init.body);
-      if (body.jsonrpc === '2.0' && typeof body.id === 'string') {
-        body.id = parseInt(body.id, 10) || 1;
-        init = { ...init, body: JSON.stringify(body) };
-      }
-    } catch {}
-  }
-  return _origFetch(input, init);
-};
-
 export const FACTORY = '0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275';
 export const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 export const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
@@ -316,7 +300,7 @@ export async function addressBalance(addr) {
  */
 export async function transferEvidence(hash) {
   // A read-only client works without a connected wallet.
-  const c = client || createClient({ chain: testnetBradbury, transport: customTransport(RPC_URL) });
+  const c = client || createClient({ chain: testnetBradbury });
   const tx = await c.getTransaction({ hash });
   if (!tx) return null;
   const msgs = (tx.messages || [])

@@ -109,8 +109,9 @@
 <!-- Real on-chain data via genlayer-js. Never call GenLayer contracts with
      ethers/viem aimed at the contract address — calls must route through
      ConsensusMain. See genlayer-client.js. -->
+<script src="./rpc-fix.js"></script>
 <script type="module">
-import * as gl from './gl-client.v4.js';
+import * as gl from './gl-client.v2.js';
 
 const $ = (id) => document.getElementById(id);
 let positions = [];
