@@ -1,7 +1,7 @@
 import { createClient, createAccount } from 'https://esm.sh/genlayer-js@1.1.8';
 import { testnetBradbury } from 'https://esm.sh/genlayer-js@1.1.8/chains';
 
-const FACTORY = '0x1168b74Cf4C9C42c7c1D7A16ed927774d8974275';
+const FACTORY = '0x0c100c4dC2f36e39F75C92f62De86d279eC7fB82';
 const RPC_URL = 'https://rpc-bradbury.genlayer.com';
 const EXPLORER_TX = 'https://explorer-bradbury.genlayer.com/tx/';
 const EXPLORER_ADDR = 'https://explorer-bradbury.genlayer.com/address/';
@@ -149,6 +149,7 @@ export async function loadMarkets() {
   return markets;
 }
 
+export async function getPayout(user) { return read('getPayout', [user]); }
 export async function getMarket(id) {
   const raw = await read('getMarket', [id]);
   return parseRaw(id, raw);
@@ -159,6 +160,7 @@ export async function createMarket(question) { return write('createMarket', [que
 export async function resolve(marketId) { return write('resolve', [marketId], '0'); }
 export async function settle(marketId) { return write('settle', [marketId], '0'); }
 export async function claim(marketId) { return write('claim', [marketId], '0'); }
+export async function withdraw() { return write('withdraw', [], '0'); }
 
 export function previewPayout(market, side, stakeGen) {
   const amt = parseFloat(stakeGen) || 0;
